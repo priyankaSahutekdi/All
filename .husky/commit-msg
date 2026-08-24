@@ -1,9 +1,7 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+# No `. "$(dirname -- "$0")/_/husky.sh"` shim: that is husky v8 syntax, and this repo is on v9,
+# where it is removed. The old hook carried it, which is one reason nothing here could ever run.
 
-# Validate commit message format
 echo "📝 Validating commit message format..."
-npx --no -- commitlint --edit ${1}
+npx --no -- commitlint --edit "$1"
 
 echo "✅ Commit message is valid!"
-
