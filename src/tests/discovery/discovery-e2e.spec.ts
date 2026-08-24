@@ -55,9 +55,21 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
             return true;
         };
 
+        // Screen strings this spec matches directly, resolved for the run's language. They were
+        // inline English literals — the same defect P2-1 fixed in the page objects, in the spec
+        // that drives them, so Discovery could not have run in Hindi with only the page objects
+        // migrated. `continueExact` carries the observed Hindi wording via the registry rather
+        // than the inline `/^Continue$|जारी रखें/`, which matched Hindi even in an English run.
+        const completionPopupRe = copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang);
+        const continueExact = copyRe('continueLabel', lang, { exact: true, flags: '' });
+        const confirmLabel = copy('confirm', lang)[0];
+        const skipDemoLabel = copy('skipDemo', lang)[0];
+        const howToPlayLabel = copy('howToPlay', lang)[0];
+        /** Any of the screens login can legitimately land on (help-language modal, or past it). */
+        const postLoginLanding = copyRe(['chooseHelpLanguage', 'startAssessment', 'confirm'], lang);
+
         const completionVisible = async (): Promise<boolean> =>
-            await page.getByText(/Hurray|successfully completed|completed assessment/i)
-                .first().isVisible().catch(() => false);
+            await page.getByText(completionPopupRe).first().isVisible().catch(() => false);
 
         // Letter Hunt bubbles: the letters are baked into SVGs (no DOM text), so we
         // detect bubbles by SHAPE — small, roughly-circular, clickable elements in the
@@ -101,7 +113,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         const onDemo = async (): Promise<boolean> => {
             const txt = (await assess.getSentenceText().catch(() => '')) || '';
             if (txt.includes(DEMO_SENTENCE)) return true;
-            if (await page.getByText('How to Play').first().isVisible().catch(() => false)) return true;
+            if (await page.getByText(howToPlayLabel).first().isVisible().catch(() => false)) return true;
             return await assess.startGameButton().isVisible().catch(() => false);
         };
 
@@ -127,7 +139,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
                 await assess.clickStop().catch(() => {});
                 await page.waitForTimeout(1500);
                 // C) Skip Demo
-                if (await clickByText('Skip Demo', 1500)) {
+                if (await clickByText(skipDemoLabel, 1500)) {
                     console.log(`demo[${i}]: clicked Skip Demo`);
                     await page.waitForTimeout(5000);
                 }
@@ -159,14 +171,14 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
             // Continue to ALL → skip the entry mic-calibration. The app then lands on the
             // help-language modal (TC-002). (Post-2026-08 deployment; app runs in an iframe.)
             await loginPage.login(user.username, user.password);
-            await expect(page.getByText(/Choose your help language|Start Assessment|Confirm/i).first())
+            await expect(page.getByText(postLoginLanding).first())
                 .toBeVisible({ timeout: 20000 });
         });
 
         await test.step('TC-002: Choose help language & Confirm', async () => {
             await page.waitForTimeout(2500);
             // Help-language popup: confirm the (pre)selected option.
-            const confirmed = await clickByText('Confirm', 10000);
+            const confirmed = await clickByText(confirmLabel, 10000);
             expect(confirmed, 'help-language Confirm button should be present').toBeTruthy();
             await page.waitForTimeout(2500);
         });
@@ -259,7 +271,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         await test.step('TC-009: Complete Assessment 1 → Continue', async () => {
             await completeUntilPopup('Assessment 1');
             await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
-            await clickByText(/^Continue$|जारी रखें/, 8000);
+            await clickByText(continueExact, 8000);
             await page.waitForTimeout(3000);
         });
 
@@ -267,18 +279,18 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
             await leaveDemoIfPresent();
             await completeUntilPopup('Assessment 2');
             await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
-            await clickByText(/^Continue$|जारी रखें/, 8000);
+            await clickByText(continueExact, 8000);
             await page.waitForTimeout(3000);
         });
 
         await test.step('TC-011: Skip the Letter Hunt demo', async () => {
             // Assessment 3 (Letter Hunt) starts with a demo skipped via "Skip Demo".
-            const skipped = await clickByText('Skip Demo', 10000);
+            const skipped = await clickByText(skipDemoLabel, 10000);
             expect(skipped, 'Skip Demo button should be present on Letter Hunt demo').toBeTruthy();
             await page.waitForTimeout(3000);
             // Letter Hunt is a letter-selection game (no sentence). Verify we left the
             // demo and the game is shown (multiple single-letter bubbles present).
-            await expect(page.getByText('Skip Demo')).toHaveCount(0);
+            await expect(page.getByText(skipDemoLabel)).toHaveCount(0);
             await page.waitForTimeout(2000);
             await page.screenshot({ path: 'test-results/lh-after-skip.png' });
             const bubbles = await getLetterBubbles();

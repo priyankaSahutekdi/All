@@ -214,7 +214,9 @@ export class AssessmentPage {
                 probe.mediaPlays++;
                 // currentTime advancing is what separates "play() was called" from "audio ran".
                 this.addEventListener('timeupdate', () => {
-                    if (this.currentTime > probe.maxTime) probe.maxTime = this.currentTime;
+                    if (this.currentTime > probe.maxTime) {
+                        probe.maxTime = this.currentTime;
+                    }
                 });
                 return origPlay.apply(this, arguments as unknown as []);
             };
