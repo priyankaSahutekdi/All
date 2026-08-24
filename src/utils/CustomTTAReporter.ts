@@ -48,6 +48,9 @@ interface TestData {
     error?: string;
     errorStack?: string;
     tags: string[];
+    /** When THIS test started, in epoch ms. The report row used the run's start time for every
+     *  row, so a 4-test run showed four identical clock times and the column said nothing. */
+    startedAtMs?: number;
 }
 
 interface FileGroup {
@@ -94,7 +97,6 @@ class CustomTTAReporter implements Reporter {
     private testStepsMap: Map<string, StepData[]> = new Map();
     private testStartTimeMap: Map<string, number> = new Map();
     private testStepCounterMap: Map<string, number> = new Map();
-    private testCounter: number = 0;
     private runningTests: Map<string, TestData> = new Map();
     private completedTestIds: Set<string> = new Set();
 
@@ -132,7 +134,6 @@ class CustomTTAReporter implements Reporter {
         this.testStepsMap.set(test.id, []);
         this.testStartTimeMap.set(test.id, Date.now());
         this.testStepCounterMap.set(test.id, 0);
-        this.testCounter++;
 
         const testFile = test.location.file.split('/').pop() || '';
         console.log(`\n▶️  STARTING: ${test.title}`);
@@ -248,9 +249,22 @@ class CustomTTAReporter implements Reporter {
         let videoPath: string | undefined;
         let tracePath: string | undefined;
 
+        // Artifact filenames are keyed on the TEST, not on the shared `testCounter`.
+        //
+        // `testCounter` is incremented in onTestBegin and was read here in onTestEnd, so with
+        // workers > 1 (the config default is 3) another test can begin between one test's start
+        // and its end — the finishing test then names its files with the other test's number, and
+        // two tests can write `screenshot_N_1.png` over each other. The screenshot in the report
+        // would belong to a different test than the row showing it, which is worse than a
+        // missing screenshot because it looks correct.
+        //
+        // `test.id` is unique per test and stable; `result.retry` keeps a retry's artifacts from
+        // overwriting the original attempt's, which the counter also failed to do.
+        const artifactKey = `${test.id.replace(/[^\w-]/g, '')}_r${result.retry}`;
+
         for (const attachment of result.attachments) {
             if (attachment.contentType === 'image/png') {
-                const screenshotName = `screenshot_${this.testCounter}_${screenshots.length + 1}.png`;
+                const screenshotName = `screenshot_${artifactKey}_${screenshots.length + 1}.png`;
                 const destPath = path.join('tta-report', 'screenshots', screenshotName);
                 const destDir = path.dirname(destPath);
                 if (!fs.existsSync(destDir)) {
@@ -272,7 +286,7 @@ class CustomTTAReporter implements Reporter {
             }
 
             if (attachment.contentType === 'video/webm' && attachment.path) {
-                const videoName = `video_${this.testCounter}.webm`;
+                const videoName = `video_${artifactKey}.webm`;
                 const destPath = path.join('tta-report', 'videos', videoName);
                 const destDir = path.dirname(destPath);
                 if (!fs.existsSync(destDir)) {
@@ -287,7 +301,7 @@ class CustomTTAReporter implements Reporter {
             }
 
             if (attachment.name === 'trace' && attachment.path) {
-                const traceName = `trace_${this.testCounter}.zip`;
+                const traceName = `trace_${artifactKey}.zip`;
                 const destPath = path.join('tta-report', 'traces', traceName);
                 const destDir = path.dirname(destPath);
                 if (!fs.existsSync(destDir)) {
@@ -338,7 +352,16 @@ class CustomTTAReporter implements Reporter {
             parent = parent.parent;
         }
 
-        const tagMatches = test.title.match(/@\w+/g) || [];
+        // Tags come from Playwright's own `test.tags` (which includes tags inherited from parent
+        // describes), unioned with any @-tokens still written into the titles.
+        //
+        // This used to be `test.title.match(/@\w+/g)` alone — the TEST title. Every spec in this
+        // suite declares its tags on the DESCRIBE ("@P0 @Foundation F3 series …") and none on the
+        // test title, so that match returned nothing for every row: the report's Tags column was
+        // empty and its Priority filter (which reads data-tags) matched nothing, in a report whose
+        // whole purpose is triage.
+        const titleTags = [...describePath, test.title].join(' ').match(/@[\w-]+/g) || [];
+        const tagMatches = [...new Set([...(test.tags || []), ...titleTags])];
 
         const testData: TestData = {
             id: `test-${test.id}`,
@@ -357,6 +380,9 @@ class CustomTTAReporter implements Reporter {
             error: result.error?.message,
             errorStack: result.error?.stack,
             tags: tagMatches,
+            // Prefer Playwright's own per-test start, fall back to what onTestBegin recorded.
+            startedAtMs: result.startTime ? new Date(result.startTime).getTime()
+                : this.testStartTimeMap.get(test.id),
         };
 
         this.testResults.push(testData);
@@ -902,7 +928,10 @@ class CustomTTAReporter implements Reporter {
 
             const author = process.env.TEST_AUTHOR || 'TTA-QA';
 
-            const testStartTime = new Date(this.startTime.getTime());
+            // This test's own start, not the RUN's start — which is what every row showed before,
+            // so the Start/End Time columns were identical for every test and useless for
+            // reconstructing what ran when.
+            const testStartTime = new Date(test.startedAtMs ?? this.startTime.getTime());
             const testEndTime = new Date(testStartTime.getTime() + test.duration);
 
             const firstScreenshot = test.screenshots[0]?.path || (test.steps.find(s => s.screenshot)?.screenshot) || '';
