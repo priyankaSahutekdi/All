@@ -5,7 +5,7 @@ import { FoundationPage } from '../foundation/FoundationPage';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { AnswerSource } from '../../services/answerSource';
 import { VqaSpeakingAssessment, VqaAttempt } from './VqaSpeakingAssessment';
-import { LETTER_CLASS } from '../../utils/Text';
+import { LETTER_CLASS } from '../../utils/text';
 import { ANY_LANGUAGE_LABEL_TOKEN } from '../../utils/languages';
 import { MASTERY_TRANSITION_RE } from '../../utils/transitions';
 

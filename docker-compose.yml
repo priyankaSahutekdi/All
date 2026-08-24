@@ -4,14 +4,25 @@
 # =============================================================================
 #
 # Usage:
-#   docker-compose up                    # Run all tests with 4 shards
-#   docker-compose up shard-1            # Run only shard 1
-#   docker-compose up --scale shard=8    # Run with 8 parallel shards
+#   docker-compose up regression         # Full suite, serially (the safe default)
+#   docker-compose up smoke              # @P0 + @Smoke only, serially
 #   docker-compose down                  # Stop and remove containers
+#
+#   docker-compose --profile sharded up  # 4-way sharding — READ THE WARNING BELOW FIRST
+#
+# WHY SHARDING IS BEHIND A PROFILE
+# The specs drive shared, stateful UAT accounts (Testf2auto / Testf3auto / m4auto) through one
+# browser session each, resuming from whatever journey position the account is parked at. Each
+# shard is a separate Playwright PROCESS, so two shards can log into the same account at the same
+# time and corrupt that position — and the damage outlives the run, because the next run resumes
+# from the corrupted state. `--workers=1` does not help; it only serializes within one process.
+# `docker-compose up` used to start all four shards at once, so the unsafe path was the default.
+# Enable the profile only once each shard has its own dedicated accounts.
 #
 # =============================================================================
 
-version: '3.8'
+# No `version:` key — it is obsolete under Compose V2 (which warns about it), and `profiles:`
+# below needs V2 regardless.
 
 services:
   # Base service configuration (not run directly)
@@ -32,6 +43,7 @@ services:
     extends:
       service: playwright-base
     command: npx playwright test --shard=1/4 --reporter=list,json
+    profiles: ["sharded"]
     container_name: playwright-shard-1
 
   # Shard 2 of 4
@@ -39,6 +51,7 @@ services:
     extends:
       service: playwright-base
     command: npx playwright test --shard=2/4 --reporter=list,json
+    profiles: ["sharded"]
     container_name: playwright-shard-2
 
   # Shard 3 of 4
@@ -46,6 +59,7 @@ services:
     extends:
       service: playwright-base
     command: npx playwright test --shard=3/4 --reporter=list,json
+    profiles: ["sharded"]
     container_name: playwright-shard-3
 
   # Shard 4 of 4
@@ -53,20 +67,21 @@ services:
     extends:
       service: playwright-base
     command: npx playwright test --shard=4/4 --reporter=list,json
+    profiles: ["sharded"]
     container_name: playwright-shard-4
 
   # Smoke tests only (quick validation)
   smoke:
     extends:
       service: playwright-base
-    command: npx playwright test --grep "@P0|@Smoke" --project=chromium
+    command: npx playwright test --grep "@P0|@Smoke" --project=chromium --workers=1
     container_name: playwright-smoke
 
   # Full regression (all tests, single container)
   regression:
     extends:
       service: playwright-base
-    command: npx playwright test
+    command: npx playwright test --workers=1
     container_name: playwright-regression
 
   # Report merger (run after shards complete)
@@ -74,6 +89,7 @@ services:
     extends:
       service: playwright-base
     command: npx playwright merge-reports --reporter html ./test-results
+    profiles: ["sharded"]   # only meaningful when the shards ran
     container_name: playwright-merge
     depends_on:
       shard-1:

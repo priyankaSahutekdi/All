@@ -1,8 +1,13 @@
 name: 🚀 Smoke Tests
 
+# Was `pull_request: [main, develop]` — neither branch exists here (the default is master), so
+# this workflow had never fired.
+#
+# It is now MANUAL rather than re-pointed at master, because @P0/@Smoke matches the Discovery E2E
+# and the Foundation specs: the account-bound suite. It needs UAT credentials, runs for hours, and
+# permanently advances the shared parked accounts' journey position. That cannot gate a pull
+# request. playwright.yml's `verify` job is the credential-free per-push gate.
 on:
-  pull_request:
-    branches: [main, develop]
   workflow_dispatch:
 
 env:
@@ -31,8 +36,13 @@ jobs:
       - name: 🎭 Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
+      # --workers=1: @P0/@Smoke matches the Discovery E2E and the Foundation specs, which drive
+      # shared, stateful UAT accounts through one browser session each. Two workers on the same
+      # account corrupt each other's journey position. scripts/run-e2e.js has enforced workers=1
+      # for this reason; calling `npx playwright test` directly bypassed it and inherited
+      # fullyParallel: true with workers: 2 under CI.
       - name: 🔥 Run Smoke Tests (@P0 + @Smoke)
-        run: npx playwright test --grep "@P0|@Smoke" --project=chromium
+        run: npx playwright test --grep "@P0|@Smoke" --project=chromium --workers=1
 
       - name: 📊 Upload Smoke Test Report
         if: always()

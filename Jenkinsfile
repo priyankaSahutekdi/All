@@ -10,7 +10,10 @@
 pipeline {
     agent {
         docker {
-            image 'mcr.microsoft.com/playwright:v1.40.0-jammy'
+            // MUST match @playwright/test in package.json — the image only carries the browser
+            // builds for its own version, so a newer client fails with "Executable doesn't exist".
+            // Was pinned at v1.40.0 against a 1.60.0 client, which could not run the suite at all.
+            image 'mcr.microsoft.com/playwright:v1.60.0-jammy'
             args '-u root:root'
         }
     }
@@ -80,28 +83,39 @@ pipeline {
         stage('🧪 Run Tests') {
             steps {
                 script {
-                    def testCommand = 'npx playwright test'
-                    
+                    // --workers=1. These specs are NOT parallel-safe: they drive shared, stateful
+                    // UAT accounts (Testf2auto / Testf3auto / m4auto) through a single browser
+                    // session each, and two workers on the same account corrupt each other's
+                    // journey position. scripts/run-e2e.js has enforced workers=1 for exactly this
+                    // reason since it was written; every automated entry point bypassed it by
+                    // calling `npx playwright test` directly and silently inherited
+                    // fullyParallel: true with workers: 2 under CI.
+                    def testCommand = 'npx playwright test --workers=1'
+
                     // Add browser project
                     if (params.BROWSER != 'all') {
                         testCommand += " --project=${params.BROWSER}"
                     }
-                    
+
                     // Add test type filter
                     if (params.TEST_TYPE == 'smoke') {
                         testCommand += ' --grep "@P0|@Smoke"'
                     }
-                    
+
                     // Add custom tag filter
                     if (params.TEST_TAG?.trim()) {
                         testCommand += " --grep \"${params.TEST_TAG}\""
                     }
-                    
-                    // Add sharding for regression/all
+
+                    // Sharding is DELIBERATELY not applied. --workers=1 only serializes within a
+                    // process; N shards are N processes, so sharding reintroduces exactly the
+                    // concurrent-access problem it looks like it avoids. Re-enable only once each
+                    // shard has its own dedicated set of accounts.
                     if (params.TEST_TYPE != 'smoke' && params.SHARD_COUNT.toInteger() > 1) {
-                        testCommand += " --shard=\$SHARD/\${params.SHARD_COUNT}"
+                        echo "SHARD_COUNT=${params.SHARD_COUNT} ignored: the suite shares stateful " +
+                             'UAT accounts, so it cannot be split across processes. See P2-9.'
                     }
-                    
+
                     sh testCommand
                 }
             }

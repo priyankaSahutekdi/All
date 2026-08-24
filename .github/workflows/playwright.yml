@@ -1,10 +1,13 @@
 name: 🎭 Playwright Tests
 
+# Trigger branches are this repo's ACTUAL branches. They were [main, develop]; neither exists
+# here (the default branch is master), so this workflow had never fired — CI looked configured
+# and was dormant.
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main, develop]
+    branches: [master]
   workflow_dispatch:
     inputs:
       test_tag:
@@ -17,16 +20,53 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # Cheap, credential-free gate. This is what push/PR gets, because the E2E job below cannot
+  # sensibly gate a commit: it needs UAT credentials, takes hours, and MUTATES the shared parked
+  # accounts it drives (a run advances Testf2auto/Testf3auto's journey position permanently). A
+  # suite with side effects on shared state is not a per-push check.
+  verify:
+    name: ✅ Typecheck & Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🟢 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 📦 Install Dependencies
+        run: npm ci
+
+      - name: 🔎 Typecheck
+        run: npm run build
+
+      - name: 🧹 Lint
+        run: npm run lint
+
   test:
     name: 🧪 Run Tests
+    # Manual only. See the `verify` job above for why this does not run on push/PR.
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    
+    # Long, because the suite now runs SERIALLY (see below) and its own per-spec timeouts are
+    # 45-75 minutes. The previous 30 was sized for one of four parallel shards.
+    timeout-minutes: 180
+
+    # NO SHARD MATRIX, deliberately.
+    #
+    # These specs drive shared, stateful UAT accounts (Testf2auto / Testf3auto / m4auto) through
+    # a single browser session each. Sharding runs N Playwright PROCESSES, so two shards can log
+    # into the same account at the same time and corrupt each other's journey position — and
+    # because a parked account's position is what the specs resume from, the damage outlives the
+    # run. --workers=1 does not help: it only serializes within one process.
+    #
+    # Re-enable sharding only when each shard has its own dedicated set of accounts.
+
     steps:
       - name: 📥 Checkout Repository
         uses: actions/checkout@v4
@@ -43,19 +83,23 @@ jobs:
       - name: 🎭 Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      - name: 🧪 Run Playwright Tests (Shard ${{ matrix.shard }}/4)
+      # Routed through scripts/run-e2e.js, which is the one entry point that already knows this
+      # suite is not parallel-safe (it pins workers=1 for the regression set). Every automated
+      # entry point used to call `npx playwright test` directly and silently inherit
+      # fullyParallel: true with workers: 2 under CI — a correctness risk, not an inefficiency.
+      - name: 🧪 Run Playwright Tests (serial)
         run: |
           if [ -n "${{ github.event.inputs.test_tag }}" ]; then
-            npx playwright test --shard=${{ matrix.shard }}/4 --grep "${{ github.event.inputs.test_tag }}"
+            npx playwright test --workers=1 --grep "${{ github.event.inputs.test_tag }}"
           else
-            npx playwright test --shard=${{ matrix.shard }}/4
+            node scripts/run-e2e.js --regression
           fi
 
       - name: 📊 Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-shard-${{ matrix.shard }}
+          name: playwright-report
           path: |
             playwright-report/
             test-results/
@@ -66,45 +110,13 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: failure-screenshots-shard-${{ matrix.shard }}
+          name: failure-screenshots
           path: test-results/**/*.png
           retention-days: 7
 
-  merge-reports:
-    name: 📊 Merge Reports
-    needs: test
-    runs-on: ubuntu-latest
-    if: always()
-    
-    steps:
-      - name: 📥 Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: 🟢 Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 📦 Install Dependencies
-        run: npm ci
-
-      - name: 📥 Download All Reports
-        uses: actions/download-artifact@v4
-        with:
-          path: all-reports
-          pattern: playwright-report-shard-*
-
-      - name: 📊 Merge HTML Reports
-        run: npx playwright merge-reports --reporter html ./all-reports
-
-      - name: 📤 Upload Merged Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-merged
-          path: playwright-report/
-          retention-days: 30
-
+      # The merge-reports job that used to follow is gone with the shard matrix: with a single
+      # serial run there is nothing to merge, and `playwright merge-reports` over one blob report
+      # would just re-emit it. The report is uploaded above.
       - name: 📊 Publish Report Summary
         if: always()
         run: |
@@ -112,8 +124,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| 📊 Shards | 4 |" >> $GITHUB_STEP_SUMMARY
+          echo "| ▶️ Execution | serial (workers=1, no sharding — shared UAT accounts) |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 Browser | Chromium |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📁 Download the merged report from the Artifacts section above." >> $GITHUB_STEP_SUMMARY
+          echo "📁 Download the report from the Artifacts section above." >> $GITHUB_STEP_SUMMARY
 
