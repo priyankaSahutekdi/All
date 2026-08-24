@@ -55,4 +55,3 @@ CMD ["npx", "playwright", "test"]
 #   docker run --rm playwright-framework npx playwright test login.spec.ts
 #
 # =============================================================================
-
