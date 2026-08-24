@@ -317,6 +317,25 @@ export class FoundationPage {
         );
     }
 
+    /**
+     * Assert the app is actually running in `lang`, by the same header-switcher read that
+     * `switchToLanguage` verifies itself with.
+     *
+     * Public because a spec that drives the language-selection UI by hand needs to assert the
+     * OUTCOME, not just that its clicks found something to click: "the language dropdown was
+     * operated" and "the app is in the requested language" are different claims, and only the
+     * second one is worth a test. Polled for the same reason step 5 of `switchToLanguage` is —
+     * the header re-renders after a language change and a single read can race it.
+     */
+    async expectAppInLanguage(lang: string | AppLanguage = 'english'): Promise<void> {
+        const target = typeof lang === 'string' ? languageByCode(lang) : lang;
+        await expect.poll(async () => this.headerShowsLanguage(labelRe(target)), {
+            timeout: 15000,
+            message: `expected the app to be running in '${target.code}' (${target.label}); `
+                + 'the header language switcher does not show it',
+        }).toBe(true);
+    }
+
     /** Does the top-right header switcher currently show a label matching `labelPattern`? */
     private async headerShowsLanguage(labelPattern: RegExp): Promise<boolean> {
         return this.page.evaluate(({ s, f }) => {

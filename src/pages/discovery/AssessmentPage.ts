@@ -185,6 +185,80 @@ export class AssessmentPage {
         await this.playButton().click({ timeout: AssessmentPage.CLICK_TIMEOUT });
     }
 
+    // ---- Playback verification ----------------------------------------------
+    // "The Play button is still visible after clicking it" is true whether or not anything
+    // played, so a replay test built on that proves nothing. These two methods let a spec
+    // assert that audio actually STARTED.
+    //
+    // BOTH playback mechanisms are hooked because which one this app uses for replay has not
+    // been confirmed: an <audio>/<video> element (HTMLMediaElement.play) or Web Audio
+    // (AudioBufferSourceNode.start, which is what FoundationPage's own mic injection uses).
+    // Hooking only one would make the assertion depend on an unverified assumption, and would
+    // fail for the wrong reason if the app used the other.
+
+    /** Install the playback probe. Must be called BEFORE the click that starts playback. */
+    async installPlaybackProbe(): Promise<void> {
+        await this.page.evaluate(() => {
+            const w = window as unknown as { __playbackProbe?: { mediaPlays: number; webAudioStarts: number; maxTime: number } };
+            if (w.__playbackProbe) {
+                w.__playbackProbe.mediaPlays = 0;
+                w.__playbackProbe.webAudioStarts = 0;
+                w.__playbackProbe.maxTime = 0;
+                return;
+            }
+            const probe = { mediaPlays: 0, webAudioStarts: 0, maxTime: 0 };
+            w.__playbackProbe = probe;
+
+            const origPlay = HTMLMediaElement.prototype.play;
+            HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+                probe.mediaPlays++;
+                // currentTime advancing is what separates "play() was called" from "audio ran".
+                this.addEventListener('timeupdate', () => {
+                    if (this.currentTime > probe.maxTime) probe.maxTime = this.currentTime;
+                });
+                return origPlay.apply(this, arguments as unknown as []);
+            };
+
+            const BufferSource = (window as unknown as { AudioBufferSourceNode?: { prototype: { start: unknown } } }).AudioBufferSourceNode;
+            if (BufferSource) {
+                const proto = BufferSource.prototype as { start: (...a: unknown[]) => unknown };
+                const origStart = proto.start;
+                proto.start = function (this: unknown, ...args: unknown[]) {
+                    probe.webAudioStarts++;
+                    return origStart.apply(this, args);
+                };
+            }
+        });
+    }
+
+    /** What the probe has observed since `installPlaybackProbe`. */
+    async playbackObserved(): Promise<{ mediaPlays: number; webAudioStarts: number; maxTime: number }> {
+        return await this.page.evaluate(() => {
+            const w = window as unknown as { __playbackProbe?: { mediaPlays: number; webAudioStarts: number; maxTime: number } };
+            return w.__playbackProbe || { mediaPlays: 0, webAudioStarts: 0, maxTime: 0 };
+        });
+    }
+
+    /**
+     * Expect audio playback to have started by either mechanism.
+     *
+     * The failure message names both candidate causes on purpose: a genuine no-op replay
+     * button, and a third playback mechanism this probe does not hook. Those are the only two
+     * explanations for a failure here, and a reader of the log should not have to guess which.
+     */
+    async expectPlaybackStarted(): Promise<void> {
+        await expect.poll(async () => {
+            const o = await this.playbackObserved();
+            return o.mediaPlays + o.webAudioStarts;
+        }, {
+            timeout: 10000,
+            message: 'expected replay to start audio playback, but neither HTMLMediaElement.play() '
+                + 'nor AudioBufferSourceNode.start() fired. Either the Play button is a no-op, or '
+                + 'this build replays audio by a mechanism the probe does not hook '
+                + '(see AssessmentPage.installPlaybackProbe)',
+        }).toBeGreaterThan(0);
+    }
+
     /**
      * Click retry button to re-record
      */

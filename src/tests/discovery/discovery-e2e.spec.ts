@@ -7,6 +7,8 @@ import {
 import { FoundationPage } from '../../pages/foundation';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
+import { ANY_LANGUAGE_LABEL_TOKEN, labelRe } from '../../utils/languages';
+import { copy, copyRe } from '../../utils/uiCopy';
 
 /**
  * Full end-to-end Discovery + F-series flow — TC-001 → TC-013 — executed in a SINGLE
@@ -169,17 +171,28 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
             await page.waitForTimeout(2500);
         });
 
-        await test.step('TC-003: Choose learning language English & Confirm', async () => {
-            // Open the top-right language dropdown (shows हिंदी / English).
-            await page.locator('div.MuiBox-root', { hasText: /^हिंदी$|^English$/ }).last()
+        await test.step(`TC-003: Choose learning language ${lang.label} & Confirm`, async () => {
+            // Open the top-right language dropdown. The labels come from the language registry,
+            // not the inline /^हिंदी$|^English$/ this used to carry — that literal named the two
+            // languages it happened to know about and could not follow the run's language.
+            await page.locator('div.MuiBox-root', { hasText: ANY_LANGUAGE_LABEL_TOKEN }).last()
                 .click({ force: true }).catch(() => {});
             await page.waitForTimeout(2000);
-            await clickByText('English', 5000);            // select English in popup
+            // Both clicks are ASSERTED, not discarded. Previously their return values were
+            // dropped, so a run where neither control existed still reached the final assert
+            // below — and that assert ("Start Assessment" is visible) is true regardless of
+            // which language the app is in, which made the whole step a no-op-tolerant pass.
+            const picked = await clickByText(labelRe(lang), 5000);
+            expect(picked, `the ${lang.label} option should be present in the language dropdown`).toBeTruthy();
             await page.waitForTimeout(800);
-            await clickByText('Confirm', 5000);            // confirm selection
+            const confirmed = await clickByText(copyRe('confirm', lang, { exact: true }), 5000);
+            expect(confirmed, 'learning-language Confirm button should be present').toBeTruthy();
             await page.waitForTimeout(2500);
-            // English now active on the assessment landing.
-            await expect(page.getByText('Start Assessment', { exact: true }).first())
+            // The OUTCOME, which is what this step is actually about: the app is running in the
+            // run's language. Asserted via the same header read switchToLanguage verifies with.
+            await foundation.expectAppInLanguage(lang);
+            // …and the assessment landing is reachable.
+            await expect(page.getByText(copy('startAssessment', lang)[0], { exact: true }).first())
                 .toBeVisible({ timeout: 15000 });
         });
 
@@ -204,8 +217,16 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
 
         await test.step('TC-006: Replay the recorded audio', async () => {
             await expect(assess.playButton()).toBeVisible();
+            // Probe installed BEFORE the click. This step used to assert only that the Play
+            // button was visible before and after clicking it — true whether or not anything
+            // played, so a no-op Play button passed. Now the claim is that audio STARTED.
+            await assess.installPlaybackProbe();
             await assess.clickPlay();
-            await page.waitForTimeout(2000);
+            await assess.expectPlaybackStarted();
+            const observed = await assess.playbackObserved();
+            console.log(`[TC-006] playback: mediaPlays=${observed.mediaPlays} `
+                + `webAudioStarts=${observed.webAudioStarts} maxTime=${observed.maxTime.toFixed(2)}s`);
+            // The control is still available afterwards (replay is repeatable).
             await expect(assess.playButton()).toBeVisible();
         });
 
