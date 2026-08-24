@@ -71,11 +71,10 @@ const UI_COPY = {
     // buttons are translatable like every other screen string; `transitions.ts` still owns
     // the two MATCHING STRATEGIES built from them (see the note in that file).
     /**
-     * The Hindi value is the ONE observed non-English string this repo has ever carried: it was
-     * an inline `/^Continue$|जारी रखें/` in `AssessmentPage.continueButton`, i.e. somebody hit
-     * this screen on a Hindi build and wrote down what it said. Preserved here rather than
-     * discarded, because observed copy is exactly what this registry wants and there is no way
-     * to re-derive it without a Hindi run. NOT re-verified against a current build.
+     * Hindi value was carried forward, unverified, from an old inline
+     * `/^Continue$|जारी रखें/` literal — someone observed it once but the current build had
+     * never re-confirmed it. **Re-verified live 2026-08-19 (H11)**: the Assessment 1 completion
+     * popup's own CTA reads exactly "जारी रखें". P2-15 closed.
      */
     continueLabel: { english: 'Continue', hindi: 'जारी रखें' },
     next: { english: 'Next' },
@@ -91,10 +90,21 @@ const UI_COPY = {
     gotIt: { english: 'Got it' },
 
     // ── Journey map / placement screens ─────────────────────────────────────
-    learningJourney: { english: 'learning journey' },
-    languageSkills: { english: 'language skills' },
-    /** The journey-map entry into a Foundation level; `{level}` is the F# code. */
-    startFoundationLevel: { english: 'Start {level}' },
+    /**
+     * Hindi values observed live 2026-08-19 (H11) on the discovery-result/placement screen
+     * (reached by failing the Letter Hunt): "शाबाश!!! आपके पास अच्छी भाषा कौशल है। आप स्तर B से
+     * शुरू कर सकते हैं। सीखने की यात्रा शुरू हो!" — literal substrings, with the placement
+     * level ("B") deliberately excluded, same reason the English values exclude any level.
+     */
+    learningJourney: { english: 'learning journey', hindi: 'सीखने की यात्रा' },
+    languageSkills: { english: 'language skills', hindi: 'भाषा कौशल' },
+    /**
+     * The journey-map entry into a Foundation level; `{level}` is the F# code. Hindi observed
+     * live 2026-08-19 (H11) via the F1 landing screen's accessibility snapshot: "F1 शुरू करें" —
+     * note the REVERSED word order vs English (level first, then the "start" verb), which is why
+     * this is a template rather than a fixed prefix/suffix string.
+     */
+    startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें' },
     startLevel: { english: 'Start Level' },
     levelWord: { english: 'Level' },
     foundationWord: { english: 'Foundation' },
@@ -135,7 +145,16 @@ const UI_COPY = {
     notQuite: { english: 'not quite' },
 
     // ── Completion ──────────────────────────────────────────────────────────
-    hurray: { english: 'Hurray' },
+    /**
+     * Hindi value observed live 2026-08-19 (H11) on the Assessment 1 completion popup:
+     * "शाबाश!!! आपने असेसमेंट 1 सफलतापूर्वक पूरा कर लिया है जारी रखें". `hurray` itself is the
+     * popup's heading, "शाबाश!!!" — confirmed correct for the ASSESSMENT completion popup only
+     * (`AssessmentPage.completionPopup`, `discovery-e2e.spec.ts`'s `completionPopupRe`). This key
+     * is ALSO used by `FoundationPage.completion` and `FoundationPage.resultMessage` (F1 node
+     * completions, the Letter-Hunt-fail result screen) — NOT yet confirmed those screens render
+     * the same "शाबाश!!!"; H12/H10 must re-verify before relying on it there.
+     */
+    hurray: { english: 'Hurray', hindi: 'शाबाश!!!' },
     successfully: { english: 'successfully' },
     complete: { english: 'complete' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
@@ -145,9 +164,16 @@ const UI_COPY = {
      * `complete` STEMS above but are not duplicates of them: the stems back FoundationPage's
      * deliberately loose "did the node finish?" heuristic, while these are the specific
      * wordings the popup renders and are what `expectCompletionPopupVisible` asserts on.
+     * Hindi values observed live 2026-08-19 (H11), both literal substrings of the popup's own
+     * body text ("आपने असेसमेंट 1 सफलतापूर्वक पूरा कर लिया है") with the assessment NUMBER
+     * deliberately excluded — same reason the English values exclude it — so the same pattern
+     * matches both Assessment 1 and Assessment 2's completion (only Assessment 1's popup was
+     * directly observed; Assessment 2's is assumed identical apart from the number, since both
+     * are driven by the same `completeUntilPopup`/`AssessmentPage.completionPopup` code path).
+     * Used only here — no cross-screen reuse risk like `hurray` above.
      */
-    successfullyCompleted: { english: 'successfully completed' },
-    completedAssessment: { english: 'completed assessment' },
+    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है' },
+    completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट' },
 
     // ── Errors ──────────────────────────────────────────────────────────────
     couldntConnect: { english: "Couldn't connect right now" },
@@ -287,6 +313,25 @@ export function copyRe(keys: CopyKey | readonly CopyKey[], lang: AppLanguage, op
     const { exact = false, flags = 'i' } = opts;
     const body = copyAlt(keys, lang, opts);
     return new RegExp(exact ? `^${body}$` : body, flags);
+}
+
+/**
+ * `copyRe`, but `null` instead of throwing when `lang` has no value for `keys`.
+ *
+ * For the rare call site that has an established NON-TEXT fallback already (geometry, role) and
+ * genuinely cannot observe a translation because there is no text to observe — e.g. an icon-only
+ * button (confirmed live, H11, 2026-08-19: `FoundationPage.clickLetsStart`'s F1-entry button is
+ * an SVG `<path>` with no `<text>` element in Hindi at all). This is NOT a way to silently ignore
+ * a translation gap that could be filled — `copy`/`copyRe` still throw for every other call site,
+ * exactly per the DESIGN note above, and this helper's own doc-comment is the place a future
+ * reader checks before reaching for it.
+ */
+export function tryCopyRe(keys: CopyKey | readonly CopyKey[], lang: AppLanguage, opts: CopyReOptions = {}): RegExp | null {
+    try {
+        return copyRe(keys, lang, opts);
+    } catch {
+        return null;
+    }
 }
 
 /**

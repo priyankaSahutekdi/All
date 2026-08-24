@@ -58,8 +58,11 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         // that drives them, so Discovery could not have run in Hindi with only the page objects
         // migrated. `continueExact` carries the observed Hindi wording via the registry rather
         // than the inline `/^Continue$|जारी रखें/`, which matched Hindi even in an English run.
-        const completionPopupRe = copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang);
-        const continueExact = copyRe('continueLabel', lang, { exact: true, flags: '' });
+        // Lazy (not resolved until first call): these keys are only needed starting TC-009
+        // (assessment completion), same principle as `lazyProp` in the page objects (EL-6) — a
+        // language missing them can still run TC-001..TC-008 instead of failing at test startup.
+        const completionPopupRe = (): RegExp => copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang);
+        const continueExact = (): RegExp => copyRe('continueLabel', lang, { exact: true, flags: '' });
         /**
          * TC-002's help-language popup Confirm — FIXED ENGLISH, not `lang`. H2a (2026-08-19)
          * proved live that this screen renders "Confirm" in English regardless of the run's
@@ -83,7 +86,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         );
 
         const completionVisible = async (): Promise<boolean> =>
-            await page.getByText(completionPopupRe).first().isVisible().catch(() => false);
+            await page.getByText(completionPopupRe()).first().isVisible().catch(() => false);
 
         // Letter Hunt bubbles: the letters are baked into SVGs (no DOM text), so we
         // detect bubbles by SHAPE — small, roughly-circular, clickable elements in the
@@ -285,7 +288,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         await test.step('TC-009: Complete Assessment 1 → Continue', async () => {
             await completeUntilPopup('Assessment 1');
             await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
-            await clickByText(continueExact, 8000);
+            await clickByText(continueExact(), 8000);
             await page.waitForTimeout(3000);
         });
 
@@ -293,7 +296,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
             await leaveDemoIfPresent();
             await completeUntilPopup('Assessment 2');
             await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
-            await clickByText(continueExact, 8000);
+            await clickByText(continueExact(), 8000);
             await page.waitForTimeout(3000);
         });
 
