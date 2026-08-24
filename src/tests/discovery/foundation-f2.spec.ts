@@ -55,7 +55,7 @@ test.describe('@P0 @Foundation F2 series (single session, F2 account)', () => {
             // Continue in the SAME session from post-A1: complete the Learn/Practice nodes
             // and the next two Apply challenges (A2, then the final A3).
             const nodes = await foundation.completeFoundationThroughApply(2, 2);   // A2, A3
-            console.log(`[TC-021] F2 nodes (A2→A3): ${nodes.join(' ')}; level=${await foundation.foundationLevel()}`);
+            console.log(`[TC-020] F2 nodes (A2→A3): ${nodes.join(' ')}; level=${await foundation.foundationLevel()}`);
             // Completed A2 and A3 (two more Apply challenges) …
             expect(nodes, `nodes: ${nodes.join(' ')}`).toContain('A2');
             expect(nodes, `nodes: ${nodes.join(' ')}`).toContain('A3');
