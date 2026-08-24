@@ -23,31 +23,44 @@ import { findTabByTextClosure } from '../../utils/GeometryLocator';
 export class DiscoveryLoginPage {
     private page: Page;
     /**
-     * The mic-calibration "Skip" pattern for the run's language.
+     * The mic-calibration "Skip" pattern — FIXED ENGLISH, not the run's `lang`.
      *
      * WHERE THE LANGUAGE BOUNDARY IS on this page: everything down to "Continue to ALL" belongs
      * to the AXL PLATFORM SHELL, which is reached before any learning-app language exists — the
      * language switcher lives inside the ALL Platform, i.e. after that button. Those labels are
-     * therefore left as literals deliberately, not by omission. Whether the AXL shell localizes
-     * at all has NOT been observed on a non-English build (HINDI_READINESS_PLAN.md P2-1b).
+     * therefore left as literals deliberately, not by omission.
      *
-     * `skipMicTestIfPresent` is the exception: the mic-calibration screen is already inside the
-     * ALL Platform, so its "Skip" is app copy and follows the run's language — the same string
-     * `sessionResume` de-hardcoded in P1-9, which reaches this screen by the other path.
+     * `skipMicTestIfPresent` was ONCE THOUGHT to be an exception to that boundary — the comment
+     * here used to claim its "Skip" is app copy that follows the run's language, on the theory
+     * that the mic-calibration screen is already inside the ALL Platform. **H2a (2026-08-19)
+     * disproved that theory live**: on a real `--lang=hindi` run this screen still rendered
+     * "Skip" in English (`EXECUTION_LOG.md` EL-7) — because the app has not yet been told which
+     * language the user wants at this point in the flow (that happens later, at the TC-003
+     * learning-language switcher). This is H-1 (`DECISIONS.md` D-10); `skip` in `uiCopy.ts` is
+     * therefore English-only on purpose, and this pattern resolves it in English UNCONDITIONALLY
+     * — not in `lang` — regardless of what language the run targets.
      */
     /**
-     * Lazy (`lazyProp`, `uiCopy.ts`): resolved on first read, not at construction — so a
-     * language missing the 'skip' value doesn't stop this class from being constructed at all,
-     * only from calling `skipMicTestIfPresent`/`micTestSkip`.
+     * Lazy (`lazyProp`, `uiCopy.ts`): resolved on first read, not at construction. Since the
+     * source language is now always English (see above), laziness no longer guards against a
+     * missing translation — it is kept anyway for consistency with the rest of this codebase's
+     * pattern-builders and because it costs nothing.
      */
     private readonly micSkipPattern!: RegExp;
 
     /** Grade selected during guest login (options 1..8). Config-driven; default "2". */
     static readonly DEFAULT_GRADE = process.env.GRADE || '2';
 
-    constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
+    /**
+     * `lang` is accepted (and passed by every call site) for API consistency with the other page
+     * objects on this journey, but is currently unused here: every string this page matches is
+     * either fixed AXL-shell English (see `micSkipPattern` above) or plain role/css locators with
+     * no language dependency at all. Kept as a parameter, not removed, so a future genuinely
+     * language-dependent addition to this page does not need a call-site signature change.
+     */
+    constructor(page: Page, _lang: AppLanguage = languageByCode('english')) {
         this.page = page;
-        lazyProp(this, 'micSkipPattern', () => copyRe('skip', lang, { exact: true }));
+        lazyProp(this, 'micSkipPattern', () => copyRe('skip', languageByCode('english'), { exact: true }));
     }
 
     // ============================================

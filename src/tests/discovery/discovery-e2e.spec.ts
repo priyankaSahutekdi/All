@@ -6,8 +6,8 @@ import { DiscoveryLoginPage, AssessmentPage } from '../../pages/discovery';
 import { FoundationPage } from '../../pages/foundation';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
-import { ANY_LANGUAGE_LABEL_TOKEN, labelRe } from '../../utils/languages';
-import { copy, copyRe } from '../../utils/uiCopy';
+import { ANY_LANGUAGE_LABEL_TOKEN, labelRe, languageByCode } from '../../utils/languages';
+import { copy, copyAlt, copyRe } from '../../utils/UiCopy';
 
 /**
  * Full end-to-end Discovery + F-series flow — TC-001 → TC-013 — executed in a SINGLE
@@ -60,11 +60,27 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         // than the inline `/^Continue$|जारी रखें/`, which matched Hindi even in an English run.
         const completionPopupRe = copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang);
         const continueExact = copyRe('continueLabel', lang, { exact: true, flags: '' });
-        const confirmLabel = copy('confirm', lang)[0];
+        /**
+         * TC-002's help-language popup Confirm — FIXED ENGLISH, not `lang`. H2a (2026-08-19)
+         * proved live that this screen renders "Confirm" in English regardless of the run's
+         * target language (the app has not been told which language the user wants yet at this
+         * point in the flow — that happens later, at TC-003). This is H-1 (`DECISIONS.md` D-10).
+         * Do not confuse with TC-003's OWN Confirm button below, which correctly follows `lang`.
+         */
+        const confirmLabel = copy('confirm', languageByCode('english'))[0];
         const skipDemoLabel = copy('skipDemo', lang)[0];
         const howToPlayLabel = copy('howToPlay', lang)[0];
-        /** Any of the screens login can legitimately land on (help-language modal, or past it). */
-        const postLoginLanding = copyRe(['chooseHelpLanguage', 'startAssessment', 'confirm'], lang);
+        /**
+         * Any of the screens login can legitimately land on (help-language modal, or past it).
+         * `chooseHelpLanguage`/`confirm` are the TC-002 help-language popup — FIXED ENGLISH, same
+         * H-1 reasoning as `confirmLabel` above. `startAssessment` is the screen reached once
+         * TC-002 is already dismissed, which correctly follows `lang` (H2a confirmed it renders
+         * in Hindi on a Hindi run, e.g. "असेसमेंट शुरू करें").
+         */
+        const postLoginLanding = new RegExp(
+            `${copyAlt(['chooseHelpLanguage', 'confirm'], languageByCode('english'))}|${copyAlt('startAssessment', lang)}`,
+            'i',
+        );
 
         const completionVisible = async (): Promise<boolean> =>
             await page.getByText(completionPopupRe).first().isVisible().catch(() => false);

@@ -46,10 +46,24 @@ import { AppLanguage } from './languages';
  */
 const UI_COPY = {
     // ── App chrome / navigation ──────────────────────────────────────────────
+    /**
+     * English-only ON PURPOSE, not an unobserved gap: this key backs the mic-calibration
+     * screen's Skip button (`DiscoveryLoginPage.micSkipPattern`, `sessionResume.ts`), which H2a
+     * (2026-08-19) proved renders "Skip" in fixed English on a live Hindi-targeted run — that
+     * screen is reached before the app has been told any language, so there is no Hindi string
+     * to observe here. See `DECISIONS.md` D-10 and `EXECUTION_LOG.md` EL-7.
+     */
     skip: { english: 'Skip' },
-    confirm: { english: 'Confirm' },
+    /**
+     * Hindi value is TC-003's learning-language dropdown confirm ("भाषा चुनें" popup), observed
+     * live via H2a (2026-08-19) — NOT the help-language popup's Confirm (TC-002), which renders
+     * fixed English for the same reason as `skip` above and is matched via a hardcoded literal
+     * at its own call site instead of this key. See `DECISIONS.md` D-10.
+     */
+    confirm: { english: 'Confirm', hindi: 'कन्फर्म करें' },
+    /** English-only — TC-002's help-language popup renders fixed English; see `confirm` above. */
     chooseHelpLanguage: { english: 'Choose your help language' },
-    startAssessment: { english: 'Start Assessment' },
+    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें' },
     letsStart: { english: "Let's Start" },
 
     // ── Transition / advance controls ────────────────────────────────────────
@@ -67,8 +81,8 @@ const UI_COPY = {
     next: { english: 'Next' },
     nextLevel: { english: 'Next Level' },
     letsGo: { english: "Let's Go" },
-    startGame: { english: 'Start Game' },
-    skipDemo: { english: 'Skip Demo' },
+    startGame: { english: 'Start Game', hindi: 'खेल शुरू करें' },
+    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें' },
     claim: { english: 'Claim' },
     collect: { english: 'Collect' },
     finish: { english: 'Finish' },
@@ -86,7 +100,7 @@ const UI_COPY = {
     foundationWord: { english: 'Foundation' },
 
     // ── Activity identification ─────────────────────────────────────────────
-    howToPlay: { english: 'How to Play' },
+    howToPlay: { english: 'How to Play', hindi: 'कैसे खेलें' },
     letterLauncher: { english: 'Letter Launcher' },
     memoryChallenge: { english: 'Memory Challenge' },
     letterRecognition: { english: 'Letter Recognition' },

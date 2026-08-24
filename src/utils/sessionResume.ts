@@ -62,10 +62,14 @@ export async function resumeParkedAccount(
         await opts.beforeSkipCheck();
     }
     if (opts.micSkip) {
-        // The label comes from the uiCopy registry, not a literal: a hardcoded /^Skip$/i simply
-        // never matches on a non-English build, so the button is silently not clicked and the
-        // resume lands on the mic-calibration screen instead of the saved journey.
-        const skip = page.getByRole('button', { name: copyRe('skip', target, { exact: true }) }).first();
+        // FIXED ENGLISH, not `target` — this is the same mic-calibration screen as
+        // `DiscoveryLoginPage.micSkipPattern`, and H2a (2026-08-19) proved live that it renders
+        // "Skip" in English regardless of the run's target language: the app has not been told
+        // which language the user wants yet at this point in the flow. The comment this replaced
+        // ("a hardcoded /^Skip$/i simply never matches on a non-English build") was P1-9's
+        // untested assumption, not an observation — H2a's live evidence corrects it. See
+        // `DECISIONS.md` D-10, `EXECUTION_LOG.md` EL-7.
+        const skip = page.getByRole('button', { name: copyRe('skip', languageByCode('english'), { exact: true }) }).first();
         if (await skip.isVisible({ timeout: opts.micSkip.timeoutMs }).catch(() => false)) {
             await skip.click({ force: true });
             await page.waitForTimeout(opts.micSkip.postWaitMs);
