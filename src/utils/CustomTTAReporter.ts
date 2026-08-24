@@ -72,6 +72,12 @@ interface RunSummary {
     total: number;
     durationMs: number;
     env: string;
+    /**
+     * Which language the run targeted (config/language.ts / TEST_LANG). Optional because
+     * sidecars written before the LANG axis existed do not carry it — readRunSummary() must
+     * keep working for those, so history.html omits the badge rather than showing 'undefined'.
+     */
+    lang?: string;
     mode: string;
     startedAt: string;
 }
@@ -106,6 +112,7 @@ class CustomTTAReporter implements Reporter {
         console.log(`║  📅 Started: ${this.startTime.toLocaleString().padEnd(47)}║`);
         console.log(`║  📊 Total Tests: ${String(totalTests).padEnd(44)}║`);
         console.log(`║  🌐 Environment: ${(process.env.TEST_ENV || 'UAT').padEnd(44)}║`);
+        console.log(`║  🗣️  Language: ${(process.env.TEST_LANG || 'english').padEnd(46)}║`);
         console.log(`║  🖥️  Mode: ${(process.env.TEST_MODE || 'headless').padEnd(50)}║`);
         console.log('╚════════════════════════════════════════════════════════════════╝\n');
 
@@ -628,6 +635,7 @@ class CustomTTAReporter implements Reporter {
             total: this.suiteStats.total,
             durationMs: this.endTime.getTime() - this.startTime.getTime(),
             env: process.env.TEST_ENV || 'UAT',
+            lang: process.env.TEST_LANG || 'english',
             mode: process.env.TEST_MODE || 'headless',
             startedAt: this.startTime.toISOString(),
         };
@@ -673,6 +681,7 @@ class CustomTTAReporter implements Reporter {
         .run-badge.failed { background: #ef4444; }
         .run-badge.skipped { background: #94a3b8; }
         .run-badge.env { background: #eef2ff; color: #4338ca; }
+        .run-badge.lang { background: #fdf4ff; color: #a21caf; }
         .run-badge.duration { background: #f1f5f9; color: #475569; }
     </style>
 </head>
@@ -691,6 +700,7 @@ class CustomTTAReporter implements Reporter {
                     <span class="run-badge skipped">⏭️ ${summary.skipped}</span>
                     <span class="run-badge duration">${this.formatDuration(summary.durationMs)}</span>
                     <span class="run-badge env">${summary.env}/${summary.mode}</span>
+                    ${summary.lang ? `<span class="run-badge lang">${this.escapeHtml(summary.lang)}</span>` : ''}
                 </div>`
                 : '';
             return `<div class="report-item">
@@ -792,6 +802,10 @@ class CustomTTAReporter implements Reporter {
             <div class="meta-item">
                 <span class="meta-label">Environment</span>
                 <span class="env-badge">🌐 ${env.toUpperCase()}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Language</span>
+                <span class="env-badge">🗣️ ${this.escapeHtml((process.env.TEST_LANG || 'english').toUpperCase())}</span>
             </div>
             <div class="meta-item">
                 <span class="meta-label">Mode</span>
