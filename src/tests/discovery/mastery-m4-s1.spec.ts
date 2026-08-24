@@ -5,7 +5,6 @@ import { AnswerSource, ContentApiAnswerSource, VisionAnswerSource } from '../../
 import { VisionService } from '../../services/visionService';
 import { installSpeechRepeatHook } from '../../utils/speechHook';
 import { resumeParkedAccount } from '../../utils/sessionResume';
-import accounts from '../../testdata/english/accounts.json';
 
 /**
  * Mastery M4 — S1 assessment. TC-024: complete the S1 "Look at the picture and speak the
@@ -57,7 +56,7 @@ test.describe('@P0 @Mastery M4 S1 (single session, m4auto)', () => {
     // BLOCKED (app-side, build #1): the S1 answer cannot be submitted — see the block comment
     // above for the exact, evidence-backed root cause. Kept as fixme so it is tracked as
     // pending and never reported as a false pass.
-    test.fixme('TC-024 M4 S1: speak-the-answer picture assessment → advance to next stage', async ({ page }) => {
+    test.fixme('TC-024 M4 S1: speak-the-answer picture assessment → advance to next stage', async ({ page, accounts, lang }) => {
         test.setTimeout(25 * 60 * 1000);
 
         // Choose the answer source. Content-API is the default (deterministic + free); set
@@ -84,6 +83,7 @@ test.describe('@P0 @Mastery M4 S1 (single session, m4auto)', () => {
         await test.step('Login (m4auto) → English → reach the S1 assessment', async () => {
             await resumeParkedAccount(page, foundation, {
                 ...accounts.m4,
+                lang,
                 micSkip: false,
                 ignoreLanguageSwitchErrors: true,   // this call already swallowed the error
             });

@@ -7,7 +7,6 @@ import {
 import { FoundationPage } from '../../pages/foundation';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
-import englishDiscoveryData from '../../testdata/english/discovery-data.json';
 
 /**
  * Full end-to-end Discovery + F-series flow — TC-001 → TC-013 — executed in a SINGLE
@@ -21,13 +20,14 @@ import englishDiscoveryData from '../../testdata/english/discovery-data.json';
  * centred round-toggle coordinates for the record/stop control (see AssessmentPage).
  */
 
-// Was an inline literal; moved to testdata/english/ so a Hindi run has a designed place for
-// its own demo-detection sentence instead of a second hardcoded literal (REFACTORING_PLAN.md R5).
-const DEMO_SENTENCE = englishDiscoveryData.demoSentence;
-
 test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, single login)', () => {
-    test('TC-001 to TC-013: discovery flow then F1 entry', async ({ page }) => {
+    test('TC-001 to TC-013: discovery flow then F1 entry', async ({ page, discoveryData }) => {
         test.setTimeout(75 * 60 * 1000); // up to 75 min (deep F1 flow: Discovery + L1–L9/P1–P9 + A1–A3)
+
+        // Per-language literal, loaded at runtime from testdata/<lang>/discovery-data.json.
+        // Was an inline literal, then a static english/ import — neither could follow a Hindi
+        // run. It now arrives via the `discoveryData` fixture (REFACTORING_PLAN.md R5 + R1).
+        const DEMO_SENTENCE = discoveryData.demoSentence;
 
         const loginPage = new DiscoveryLoginPage(page);
         const micPage = new MicrophoneTestPage(page);

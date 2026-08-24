@@ -2,7 +2,6 @@ import { test, expect } from '../../fixtures/appTest';
 import { FoundationPage } from '../../pages/foundation/FoundationPage';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { resumeParkedAccount } from '../../utils/sessionResume';
-import accounts from '../../testdata/english/accounts.json';
 
 /**
  * Mastery M4 — "Sentence Reading (Simple)". TC-023: complete the practice nodes P1 → P4
@@ -28,7 +27,7 @@ import accounts from '../../testdata/english/accounts.json';
  * resumes at S1; a fresh full P1→P4 drive is re-exercised by the dynamic-user E2E.
  */
 test.describe('@P0 @Mastery M4 (single session, M4 account)', () => {
-    test('TC-023 M4: login → English → Start Level 4 → complete P1–P4 → reach S1', async ({ page }) => {
+    test('TC-023 M4: login → English → Start Level 4 → complete P1–P4 → reach S1', async ({ page, accounts, lang }) => {
         test.setTimeout(40 * 60 * 1000);
 
         const foundation = new FoundationPage(page);
@@ -39,6 +38,7 @@ test.describe('@P0 @Mastery M4 (single session, M4 account)', () => {
             // mic → resumes on the Mastery map with "Start Level 4"). Post-2026-08 AXL build.
             await resumeParkedAccount(page, foundation, {
                 ...accounts.m4,
+                lang,
                 micSkip: false,   // m4auto never shows the mic-calibration screen
                 beforeSkipCheck: () => mastery.installReadAloudInjection(),
             });

@@ -1,7 +1,6 @@
 import { test, expect } from '../../fixtures/appTest';
 import { FoundationPage } from '../../pages/foundation/FoundationPage';
 import { resumeParkedAccount } from '../../utils/sessionResume';
-import accounts from '../../testdata/english/accounts.json';
 
 /**
  * Foundation F3 series — TC-021 / TC-022. Single browser session, single login.
@@ -22,7 +21,7 @@ import accounts from '../../testdata/english/accounts.json';
  * E2E once F1→F2→F3 are chained.
  */
 test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
-    test('TC-021 / TC-022 F3: login → English → complete F3 (P1 → A3)', async ({ page }) => {
+    test('TC-021 / TC-022 F3: login → English → complete F3 (P1 → A3)', async ({ page, accounts, lang }) => {
         test.setTimeout(50 * 60 * 1000);
 
         const foundation = new FoundationPage(page);
@@ -30,6 +29,7 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
         await test.step('Login as the F3 account and resume F3 in English', async () => {
             await resumeParkedAccount(page, foundation, {
                 ...accounts.f3,
+                lang,
                 micSkip: { preWaitMs: 6000, timeoutMs: 10000, postWaitMs: 4000 },
                 // Must be installed before F3's games preload their audio.
                 beforeSkipCheck: () => foundation.installLetterLauncherHook(),

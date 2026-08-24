@@ -1,7 +1,6 @@
 import { test, expect } from '../../fixtures/appTest';
 import { FoundationPage } from '../../pages/foundation/FoundationPage';
 import { resumeParkedAccount } from '../../utils/sessionResume';
-import accounts from '../../testdata/english/accounts.json';
 
 /**
  * Foundation F2 series — single browser session, single login.
@@ -18,7 +17,7 @@ import accounts from '../../testdata/english/accounts.json';
  * play() hook reads the answer).
  */
 test.describe('@P0 @Foundation F2 series (single session, F2 account)', () => {
-    test('TC-020 F2: login → English → Start F2 → complete full F2 (A1 → A2 → A3)', async ({ page }) => {
+    test('TC-020 F2: login → English → Start F2 → complete full F2 (A1 → A2 → A3)', async ({ page, accounts, lang }) => {
         test.setTimeout(45 * 60 * 1000);
 
         const foundation = new FoundationPage(page);
@@ -28,6 +27,7 @@ test.describe('@P0 @Foundation F2 series (single session, F2 account)', () => {
             // the help-language modal is confirmed and the app language switched to English.
             await resumeParkedAccount(page, foundation, {
                 ...accounts.f2,
+                lang,
                 micSkip: { preWaitMs: 6000, timeoutMs: 10000, postWaitMs: 4000 },
             });
             // The F2 journey map shows a "Start F2" entry button.
