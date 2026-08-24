@@ -1,13 +1,17 @@
 /* eslint-disable no-console */
 /**
  * ============================================================================
- * THROWAWAY / LOCAL-ONLY — H2a Hindi observation probe. DO NOT COMMIT.
+ * REUSABLE TEMPLATE — the Hindi observation probe (H2a). Not part of the permanent test suite.
  * ============================================================================
  *
- * Purpose (HINDI_ROLLOUT_LOG.md (Readiness Plan section) Phase 4, task H2a): observe REAL Hindi app behaviour —
- * screen text, audio URLs, counters, geometry — before writing any Hindi fix. This file does
- * not become part of the permanent framework. It exists to produce evidence, not to pass/fail
- * a suite.
+ * Purpose (HINDI_ROLLOUT_LOG.md (Readiness Plan section) Phase 4, task H2a): observe REAL app behaviour in a
+ * target language — screen text, audio URLs, counters, geometry — before writing any fix for
+ * that language. It exists to produce evidence, not to pass/fail a suite: never wire it into
+ * CI or the regression run.
+ *
+ * Kept in the repo deliberately as the copyable starting point docs/LANGUAGE_ONBOARDING.md
+ * (Step 2) points future language work at — copy it, retarget the `lang`, and run it fresh
+ * rather than adding a new probe file per language or leaving this one to bit-rot unreferenced.
  *
  * Design choices, all deliberate:
  *   - Does NOT construct DiscoveryLoginPage / AssessmentPage / FoundationPage with a Hindi
