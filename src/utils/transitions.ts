@@ -1,11 +1,16 @@
 /**
- * Transition/completion button labels — "Continue", "Next Level", "Skip Demo", etc. — shared
- * vocabulary for FoundationPage and MasteryPage's own advance-button matchers.
+ * Transition/completion button matchers — "Continue", "Next Level", "Skip Demo", etc. — shared
+ * by FoundationPage and MasteryPage's own advance-button lookups.
  *
  * Before this, the same kind of word list existed twice (`FoundationPage.clickChallengeAdvance`
  * and `MasteryPage.TRANSITION_RE`), so a Hindi translation would have to be added in two places
- * and could drift. Every label below is a literal exactly once — both sites build their own
- * pattern by referencing these keys, never by re-typing the word.
+ * and could drift.
+ *
+ * The VOCABULARY now lives in `uiCopy.ts` (keys `continueLabel`, `next`, `nextLevel`, …) rather
+ * than as English literals here, because these buttons are screen copy like any other and were
+ * the single largest block of English-only strings left on the critical path — an advance button
+ * that cannot be found stalls the driver just as surely as an unrecognised screen. What stays
+ * here is the two MATCHING STRATEGIES, both now parameterized by language.
  *
  * Deliberately NOT a full merge into one shared regex or one shared matching function: the two
  * sites use genuinely different STRATEGIES —
@@ -17,61 +22,85 @@
  * deliberately excludes "Skip Demo" from `clickChallengeAdvance` — `completeF3` handles it via
  * its own dedicated check right after — and MasteryPage has no "Next Level" entry at all). Doing
  * that safely needs its own investigation and a full regression, so only the VOCABULARY is
- * shared here; each site keeps its own matching code unchanged, sourced from these constants
- * instead of inline literals. Runtime behavior for English is unchanged — every regex built from
- * these constants is byte-for-byte identical to what each site had before (verified against the
- * compiled module: same `.source`/`.flags` on every pattern).
+ * shared; each site keeps its own matching code unchanged, sourced from these builders instead
+ * of inline literals. Runtime behavior for English is unchanged — every pattern built below
+ * matches exactly what each site matched before (verified against the compiled module).
  */
 
-export const TRANSITION_LABELS = {
-    continue: 'Continue',
-    next: 'Next',
-    letsGo: "Let's Go",
-    startGame: 'Start Game',
-    claim: 'Claim',
-    collect: 'Collect',
-    finish: 'Finish',
-    done: 'Done',
-    playAgain: 'Play Again',
+import { AppLanguage, languageByCode } from './languages';
+import { CopyKey, copyAlt, copyRe } from './uiCopy';
+
+/**
+ * The `uiCopy` keys for the advance-button vocabulary, named so each site can reference a slot
+ * without re-typing a word. Both sites' label sets are sub-lists of this.
+ */
+export const TRANSITION_KEYS = {
+    continue: 'continueLabel',
+    next: 'next',
+    letsGo: 'letsGo',
+    startGame: 'startGame',
+    claim: 'claim',
+    collect: 'collect',
+    finish: 'finish',
+    done: 'done',
+    playAgain: 'playAgain',
     /** FoundationPage-only — a compound label needing its own priority slot ahead of "Next". */
-    nextLevel: 'Next Level',
-    /** MasteryPage-only — not part of FoundationPage's matcher (see the note above). */
-    skipDemo: 'Skip Demo',
+    nextLevel: 'nextLevel',
+    skipDemo: 'skipDemo',
     /** MasteryPage-only. */
-    gotIt: 'Got it',
-} as const;
+    gotIt: 'gotIt',
+} as const satisfies Record<string, CopyKey>;
 
-const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** "Let's Go" / "Lets Go" — the apostrophe is optional, as the original patterns had it. */
-const apostropheOptional = (s: string): string => escapeRe(s).replace(/'/g, "'?");
+const K = TRANSITION_KEYS;
 
-/** One label as an unanchored, case-insensitive substring pattern (e.g. for `getByText`). */
-function labelRe(label: string): RegExp {
-    return new RegExp(apostropheOptional(label), 'i');
+/**
+ * The apostrophe in "Let's Go" is optional, as the original patterns had it — the app is not
+ * consistent about rendering it. Every builder below carries this, so it is stated once.
+ */
+const APOSTROPHE = { apostrophe: 'optional' } as const;
+
+/**
+ * One or more labels as a grouped, unanchored, case-insensitive source fragment —
+ * `(?:Start Game|Skip Demo)`. Grouped so callers can anchor it (`^…$`) or drop it into a larger
+ * alternation without the precedence bug an ungrouped `a|b` would introduce.
+ */
+export function transitionAlt(keys: readonly CopyKey[], lang: AppLanguage): string {
+    return copyAlt(keys, lang, APOSTROPHE);
 }
 
-/** Several labels as ONE unanchored alternation — matches any of them as a substring. */
-function anyLabelRe(labels: readonly string[]): RegExp {
-    return new RegExp(labels.map(apostropheOptional).join('|'), 'i');
+/** One or more labels as an unanchored, case-insensitive pattern (e.g. for `getByText`). */
+export function transitionRe(keys: readonly CopyKey[], lang: AppLanguage): RegExp {
+    return copyRe(keys, lang, APOSTROPHE);
 }
-
-const T = TRANSITION_LABELS;
 
 /**
  * FoundationPage's priority-ordered advance patterns — same order and unanchored substring
  * semantics as before: the compound/specific labels first, then the rest as one group.
  */
-export const FOUNDATION_TRANSITION_PRIORITY: RegExp[] = [
-    labelRe(T.startGame),
-    labelRe(T.nextLevel),   // checked before plain "Next" so the more specific label wins
-    labelRe(T.continue),
-    labelRe(T.next),
-    anyLabelRe([T.letsGo, T.claim, T.collect, T.finish, T.done, T.playAgain]),
-];
+export function foundationTransitionPriority(lang: AppLanguage): RegExp[] {
+    return [
+        transitionRe([K.startGame], lang),
+        transitionRe([K.nextLevel], lang),   // checked before plain "Next" so the more specific label wins
+        transitionRe([K.continue], lang),
+        transitionRe([K.next], lang),
+        transitionRe([K.letsGo, K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+    ];
+}
 
 /** All labels MasteryPage matches, as ONE anchored alternation — `MasteryPage.TRANSITION_RE`. */
-export const MASTERY_TRANSITION_RE = new RegExp(
-    `^(${[T.continue, T.next, T.letsGo, T.startGame, T.skipDemo, T.claim, T.collect, T.finish, T.done, T.playAgain, T.gotIt]
-        .map(apostropheOptional).join('|')})$`,
-    'i',
-);
+export function masteryTransitionRe(lang: AppLanguage): RegExp {
+    return copyRe(
+        [K.continue, K.next, K.letsGo, K.startGame, K.skipDemo, K.claim, K.collect, K.finish,
+            K.done, K.playAgain, K.gotIt],
+        lang,
+        { ...APOSTROPHE, exact: true },
+    );
+}
+
+/**
+ * English-built constant, kept because `MasteryPage` still consumes it directly. Mastery is
+ * parked out of scope by the 2026-08-18 TC-022 scope decision, so it is not being re-plumbed to
+ * take a language yet — `masteryTransitionRe(lang)` above is what it moves to when that scope
+ * opens (HINDI_READINESS_PLAN.md P2-1c).
+ */
+export const MASTERY_TRANSITION_RE = masteryTransitionRe(languageByCode('english'));

@@ -20,7 +20,7 @@ test.describe('@P0 @Foundation F2 series (single session, F2 account)', () => {
     test('TC-020 F2: login → English → Start F2 → complete full F2 (A1 → A2 → A3)', async ({ page, accounts, lang }) => {
         test.setTimeout(45 * 60 * 1000);
 
-        const foundation = new FoundationPage(page);
+        const foundation = new FoundationPage(page, lang);
 
         await test.step('Login as the F2 account and resume F2 in English', async () => {
             // Returning user starts at the mic test → Skip it (same as Discovery TC-001), then

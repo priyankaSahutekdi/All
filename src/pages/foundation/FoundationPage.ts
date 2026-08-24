@@ -7,7 +7,143 @@ import {
     LETTER_AUDIO_RE, LETTER_AUDIO_RE_SOURCE, decodeAudioToken,
 } from '../../utils/text';
 import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../utils/languages';
-import { FOUNDATION_TRANSITION_PRIORITY } from '../../utils/transitions';
+import {
+    TRANSITION_KEYS, foundationTransitionPriority, transitionAlt, transitionRe,
+} from '../../utils/transitions';
+import { copy, copyAlt, copyRe, copyWordsAlt } from '../../utils/uiCopy';
+
+const K = TRANSITION_KEYS;
+
+/**
+ * Every on-screen string this page object matches, resolved for one language.
+ *
+ * Built once per FoundationPage rather than per call because these patterns gate screen
+ * detection inside poll loops that run hundreds of times in a 20-minute level, and because
+ * building them up front means a language with a missing translation throws at construction —
+ * naming the gap immediately instead of one stalled screen at a time (see uiCopy.ts's DESIGN
+ * note on why there is no English fallback).
+ *
+ * Several of these are consumed inside `page.evaluate`, which cannot close over Node scope, so
+ * they are passed through as `.source`/`.flags` and rebuilt in-page — the existing idiom in
+ * `text.ts` and `MasteryPage.clickButtonByText`.
+ *
+ * Exported so the English-equivalence check can compare each pattern against the inline literal
+ * it replaced, rather than the migration being taken on trust.
+ */
+export function foundationPatterns(lang: AppLanguage) {
+    /** The journey-map entry button for a Foundation level; `code` is an F# regex fragment. */
+    const startFoundation = (code: string, space: 'exact' | 'flexible' = 'flexible'): string =>
+        copyAlt('startFoundationLevel', lang, { slots: { level: code }, space });
+    /** A "<label>: N/M" readout. The colon is a formatting convention, not translated copy. */
+    const counter = (key: 'fuelLabel' | 'progressLabel'): RegExp =>
+        new RegExp(`${copyAlt(key, lang)}:\\s*(\\d+)\\s*\\/\\s*(\\d+)`, 'i');
+
+    return {
+        /** Discovery result / placement screen message. */
+        resultMessage: copyRe(['learningJourney', 'languageSkills', 'hurray'], lang),
+        /** The F1 landing entry button on the learning-journey map. */
+        startF1: new RegExp(startFoundation('F1'), 'i'),
+        /** Any "Start F#" journey-map entry (opens the next Foundation level). */
+        startAnyFoundation: new RegExp(startFoundation('F\\d+'), 'i'),
+        letsStart: copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }),
+
+        helpLanguageModal: copyRe('chooseHelpLanguage', lang),
+        confirmExact: copyRe('confirm', lang, { exact: true }),
+
+        howToPlay: copyRe('howToPlay', lang),
+        /** The two ways into a practice from its demo screen. */
+        practiceStart: transitionRe([K.startGame, K.skipDemo], lang),
+        skipDemoExact: copyRe(K.skipDemo, lang, { apostrophe: 'optional', exact: true }),
+        nextOrContinueExact: copyRe([K.next, K.continue], lang, { apostrophe: 'optional', exact: true }),
+
+        letterRecognition: copyRe('letterRecognition', lang),
+        letterLauncher: copyRe('letterLauncher', lang),
+        memoryChallenge: copyRe('memoryChallenge', lang),
+        readyForChallenge: copyRe('readyForChallenge', lang),
+
+        fuelCounter: counter('fuelLabel'),
+        progressCounter: counter('progressLabel'),
+        checkSequence: copyRe('checkSequence', lang),
+        /** The memorize window has ended and the answer grid is live. */
+        sequenceGridReady: new RegExp(
+            [copyAlt('timeUp', lang), copyAlt('lettersOfCount', lang, { slots: { n: '\\d+' } })].join('|'),
+            'i',
+        ),
+
+        /** F3 is done — the app has moved to the next-phase journey map. */
+        pastF3: copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang),
+
+        /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
+        feedbackShort: copyRe(['correct', 'great'], lang),
+        feedbackFull: copyRe(['correct', 'great', 'wellDone'], lang),
+        completion: copyRe(['hurray', 'successfully', 'complete'], lang),
+
+        connectionLost: copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }),
+        tryAgainExact: copyRe('tryAgain', lang, { exact: true }),
+
+        /**
+         * Button labels that are NOT an answer option — the transition controls plus Confirm.
+         * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
+         * the inline literal was.
+         */
+        notAnAnswerOption: new RegExp([
+            transitionAlt([K.nextLevel], lang),
+            transitionAlt([K.continue], lang),
+            transitionAlt([K.startGame], lang),
+            transitionAlt([K.skipDemo], lang),
+            `^${transitionAlt([K.next], lang)}$`,
+            copyAlt('confirm', lang),
+            transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+        ].join('|'), 'i'),
+
+        /**
+         * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
+         * words are derived from the game titles rather than re-listed, so they cannot drift
+         * away from them.
+         */
+        launcherChrome: new RegExp(
+            `^(?:${ANY_LANGUAGE_LABEL.source}|`
+            + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
+            'iu',
+        ),
+
+        /**
+         * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
+         * definitive checks at their call sites, not assertions on their own.
+         *
+         * `F2` stays a literal: F# is a level CODE the app renders identically in every language
+         * (`foundationLevel()` reads it out of `img[alt]`), not translated copy. The
+         * "<word> <number>" ordering IS an assumption that may not hold in another language —
+         * recorded as a known limitation rather than papered over, because both patterns are
+         * backed by a definitive check at the call site.
+         */
+        pastApplyMarkers: new RegExp([
+            copyAlt('complete', lang),
+            copyAlt('congratulations', lang),
+            copyAlt('wellDone', lang),
+            'F2',
+            `${copyAlt('levelWord', lang)} 2`,
+            `${copyAlt('foundationWord', lang)} 2`,
+            copyAlt('hurray', lang),
+        ].join('|'), 'i'),
+        applyCompletedMarkers: new RegExp([
+            copyAlt('complete', lang),
+            copyAlt('congratulations', lang),
+            copyAlt('wellDone', lang),
+            copyAlt('foundationWord', lang),
+            `${copyAlt('levelWord', lang)} \\d`,
+            startFoundation('F\\d', 'exact'),
+        ].join('|'), 'i'),
+
+        /** Plain (non-regex) labels, for the `getByText(exact)` call sites. */
+        labels: {
+            startGame: copy(K.startGame, lang)[0],
+            practiceStart: copy([K.startGame, K.skipDemo], lang),
+        },
+    };
+}
+
+export type FoundationCopy = ReturnType<typeof foundationPatterns>;
 
 /**
  * Page Object for the Foundation (F) series entry.
@@ -29,12 +165,41 @@ export class FoundationPage {
     private page: Page;
     private assess: AssessmentPage;
     private lhNetLetter: string | null = null;   // target letter from the network (backup to the play() hook)
+    /** The run's language, and every screen string resolved for it. */
+    private readonly lang: AppLanguage;
+    private readonly copy: FoundationCopy;
+    /** The advance-button matchers, in priority order, for `this.lang`. */
+    private readonly transitions: RegExp[];
 
-    constructor(page: Page) {
+    /**
+     * `lang` defaults to English so the parked Mastery specs (out of scope per the 2026-08-18
+     * TC-022 decision) keep constructing this unchanged. In-scope specs pass the `lang` fixture,
+     * which is what makes the LANG axis reach the page objects.
+     */
+    constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
+        this.lang = lang;
+        this.copy = foundationPatterns(lang);
+        this.transitions = foundationTransitionPriority(lang);
         // Reuse the Discovery assessment page's centred record/stop toggle for the
         // Letter Train "say the word" mic (same 70x70 centre control).
         this.assess = new AssessmentPage(page);
+    }
+
+    /**
+     * True when the app's visible text matches EVERY pattern.
+     *
+     * One place where a screen-detection pattern crosses into the page, so the `.source`/`.flags`
+     * marshalling that `page.evaluate` requires is written once instead of in each of the dozen
+     * detection helpers below. An OR is expressed as a single alternation pattern in
+     * `foundationPatterns`, which is why only the AND form is needed here.
+     */
+    private async pageTextMatchesAll(...patterns: RegExp[]): Promise<boolean> {
+        const specs = patterns.map((p) => ({ s: p.source, f: p.flags }));
+        return await this.page.evaluate((list) => {
+            const text = document.body.innerText;
+            return list.every((o) => new RegExp(o.s, o.f).test(text));
+        }, specs);
     }
 
     // ============================================
@@ -42,11 +207,10 @@ export class FoundationPage {
     // ============================================
 
     // Discovery result/placement screen message (build-independent text).
-    resultMessage = () => this.page
-        .getByText(/learning journey|language skills|Hurray/i).first();
+    resultMessage = () => this.page.getByText(this.copy.resultMessage).first();
 
     // F1 landing entry button — real DOM text on the learning-journey map.
-    startF1Button = () => this.page.getByText(/Start\s*F1/i).first();
+    startF1Button = () => this.page.getByText(this.copy.startF1).first();
 
     // ============================================
     // ACTIONS
@@ -58,7 +222,7 @@ export class FoundationPage {
      * result screen, falling back to fixed viewport-centre coordinates.
      */
     async clickLetsStart(): Promise<void> {
-        const byText = this.page.getByText(/Let.?s\s*Start/i).first();
+        const byText = this.page.getByText(this.copy.letsStart).first();
         if (await byText.click({ timeout: 4000 }).then(() => true).catch(() => false)) return;
 
         const c = await this.page.evaluate(() => {
@@ -82,7 +246,7 @@ export class FoundationPage {
     }
 
     // Generic "Start F#" journey-map entry button (opens the next Foundation level, e.g. "Start F2").
-    startFoundationButton = () => this.page.getByText(/Start\s*F\d+/i).first();
+    startFoundationButton = () => this.page.getByText(this.copy.startAnyFoundation).first();
 
     /**
      * Put the app into `lang` so a parked account resumes its saved journey.
@@ -107,8 +271,8 @@ export class FoundationPage {
         const targetRe = labelRe(target);
 
         // 1. Confirm the "Choose your help language" modal if it is showing.
-        if (await this.page.getByText(/Choose your help language/i).isVisible({ timeout: 4000 }).catch(() => false)) {
-            const helpConfirm = this.page.getByText(/^Confirm$/i).first();
+        if (await this.page.getByText(this.copy.helpLanguageModal).isVisible({ timeout: 4000 }).catch(() => false)) {
+            const helpConfirm = this.page.getByText(this.copy.confirmExact).first();
             if (await helpConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await helpConfirm.click({ force: true }).catch(() => {});
                 await this.page.waitForTimeout(2500);
@@ -134,7 +298,7 @@ export class FoundationPage {
         // 4. Pick the target language from the "Select Language" modal, then Confirm.
         await this.page.getByText(targetRe).first().click({ force: true }).catch(() => {});
         await this.page.waitForTimeout(1000);
-        const langConfirm = this.page.getByText(/^Confirm$/i).first();
+        const langConfirm = this.page.getByText(this.copy.confirmExact).first();
         if (await langConfirm.isVisible({ timeout: 3000 }).catch(() => false)) {
             await langConfirm.click({ force: true }).catch(() => {});
             await this.page.waitForTimeout(4500);
@@ -234,9 +398,7 @@ export class FoundationPage {
 
     /** True when a Letter Hunt "How to Play" practice/demo screen is showing. */
     async isOnPracticeDemo(): Promise<boolean> {
-        return await this.page.evaluate(() =>
-            /How to Play/i.test(document.body.innerText)
-            && /Start Game|Skip Demo/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.howToPlay, this.copy.practiceStart);
     }
 
     /**
@@ -244,9 +406,11 @@ export class FoundationPage {
      * content is ready (train counter "X/16" or a "How to Play" practice screen).
      */
     async dismissCoachmarks(maxTries = 6): Promise<void> {
+        const howToPlay = this.copy.howToPlay;
         for (let i = 0; i < maxTries; i++) {
-            const ready = await this.page.evaluate(() =>
-                !!document.querySelector('img[alt="train"]') || /How to Play/i.test(document.body.innerText));
+            const ready = await this.page.evaluate(({ s, f }) =>
+                !!document.querySelector('img[alt="train"]') || new RegExp(s, f).test(document.body.innerText),
+            { s: howToPlay.source, f: howToPlay.flags });
             if (ready) return;
             await this.page.keyboard.press('Escape').catch(() => {});
             await this.page.waitForTimeout(400);
@@ -492,7 +656,7 @@ export class FoundationPage {
             .click({ force: true }).catch(() => {});
         await this.page.waitForTimeout(900);         // "Correct!" feedback
         for (let adv = 0; adv < 5; adv++) {
-            if (await this.page.evaluate(() => !/Correct|Great/i.test(document.body.innerText))) break;
+            if (!await this.pageTextMatchesAll(this.copy.feedbackShort)) break;
             const nextHandle = await this.page.evaluateHandle(() => {
                 let best: Element | null = null; let bestCy = -1;
                 for (const el of Array.from(document.querySelectorAll('button, div, svg, img'))) {
@@ -530,7 +694,7 @@ export class FoundationPage {
      */
     async completeLetterHuntPractice(): Promise<void> {
         const cleanup = await this.installLetterHook();
-        const startGame = this.page.getByText('Start Game', { exact: true }).first();
+        const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
             await startGame.click({ force: true });
             await this.page.waitForTimeout(2500);
@@ -539,7 +703,7 @@ export class FoundationPage {
             let stuck = 0;
             for (let q = 0; q < 60; q++) {
                 if ((await this.trainProgress()) !== '') return;   // advanced to next node
-                if (await this.page.evaluate(() => /Hurray|successfully|complete/i.test(document.body.innerText))) return;
+                if (await this.pageTextMatchesAll(this.copy.completion)) return;
                 const letter = await this.readSpokenLetter();
                 if (!letter) { if (++stuck > 8) return; continue; }
                 stuck = 0;
@@ -559,7 +723,7 @@ export class FoundationPage {
 
     /** True when on F2's "Letter Recognition" practice (its demo or active question). */
     async isOnWordRecognition(): Promise<boolean> {
-        return await this.page.evaluate(() => /Letter Recognition/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.letterRecognition);
     }
 
     /**
@@ -568,10 +732,11 @@ export class FoundationPage {
      * matches transition screens (whose only buttons are "Next Level"/"Continue"/etc.).
      */
     private async hasWordQuestion(): Promise<boolean> {
-        return await this.page.evaluate(({ s, f }) => {
+        const notOption = this.copy.notAnAnswerOption;
+        return await this.page.evaluate(({ s, f, bs, bf }) => {
             if (!/🔊/.test(document.body.innerText)) return false;
             const oneWord = new RegExp(s, f);
-            const bad = /next level|continue|start game|skip demo|^next$|confirm|claim|collect|finish|done|play again/i;
+            const bad = new RegExp(bs, bf);
             let n = 0;
             for (const b of Array.from(document.querySelectorAll('button'))) {
                 const t = (b.textContent || '').trim();
@@ -579,7 +744,7 @@ export class FoundationPage {
                 if (oneWord.test(t) && !bad.test(t) && r.width > 40 && r.y > 200 && r.y < 560) n++;
             }
             return n >= 2;
-        }, { s: ONE_WORD.source, f: ONE_WORD.flags });
+        }, { s: ONE_WORD.source, f: ONE_WORD.flags, bs: notOption.source, bf: notOption.flags });
     }
 
     /** Read the spoken prompt word by clicking the 🔊 speaker (audio /letter/<WORD>.wav). */
@@ -613,9 +778,9 @@ export class FoundationPage {
         await this.page.waitForTimeout(1000);                    // "Correct!" feedback
         // Advance to the next question. F2 may auto-advance, or show a Next/Continue/→.
         for (let adv = 0; adv < 4; adv++) {
-            const stillFeedback = await this.page.evaluate(() => /Correct|Great|Well done/i.test(document.body.innerText));
+            const stillFeedback = await this.pageTextMatchesAll(this.copy.feedbackFull);
             if (!stillFeedback) break;
-            const nxt = this.page.getByText(/^(Next|Continue)$/i).first();
+            const nxt = this.page.getByText(this.copy.nextOrContinueExact).first();
             if (await nxt.isVisible({ timeout: 700 }).catch(() => false)) {
                 await nxt.click({ force: true }).catch(() => {});
                 await this.page.waitForTimeout(900);
@@ -633,7 +798,7 @@ export class FoundationPage {
      */
     async completeWordRecognitionPractice(): Promise<void> {
         const cleanup = await this.installLetterHook();
-        const startGame = this.page.getByText('Start Game', { exact: true }).first();
+        const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
             await startGame.click({ force: true });
             await this.page.waitForTimeout(2500);
@@ -643,7 +808,7 @@ export class FoundationPage {
             for (let q = 0; q < 60; q++) {
                 if ((await this.trainProgress()) !== '') return;      // advanced to next Letter Train
                 if (await this.isOnApplyEntry()) return;              // reached an Apply entry
-                if (await this.page.evaluate(() => /Hurray|successfully|complete/i.test(document.body.innerText))) return;
+                if (await this.pageTextMatchesAll(this.copy.completion)) return;
                 const token = await this.readSpokenViaSpeaker();
                 if (!token) { if (++stuck > 8) return; continue; }
                 stuck = 0;
@@ -664,7 +829,7 @@ export class FoundationPage {
 
     /** True when on F3's "Letter Launcher" practice (its demo or active game). */
     async isOnLetterLauncher(): Promise<boolean> {
-        return await this.page.evaluate(() => /Letter Launcher/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.letterLauncher);
     }
 
     /** Install the Letter-Launcher spoken-letter recovery (fetch + createObjectURL + play
@@ -720,20 +885,25 @@ export class FoundationPage {
     /** Current Letter-Launcher state: displayed token (a single letter OR a whole word,
      *  e.g. "O" or "he"), recovered spoken token, and fuel. */
     private async launcherState(): Promise<{ on: boolean; shown: string; spoken: string | null; fx: number; fy: number }> {
-        return await this.page.evaluate(({ s, f, langSrc }) => {
+        const { launcherChrome, fuelCounter, letterLauncher } = this.copy;
+        return await this.page.evaluate(({ s, f, chromeSrc, chromeFlags, fuelSrc, onSrc }) => {
             const w = window as unknown as { __spokenLetter: string | null };
             const body = document.body.innerText;
             // The prompt is a heading holding a pure-letter token — a single letter (letter
             // rounds) or a word (word rounds). Exclude the UI headings; the language name is
-            // one of them, and comes from the language registry so it is excluded whatever
-            // language the app is in (it used to be the literal "English").
+            // one of them, and both it and the game-title words come from registries, so they
+            // are excluded whatever language the app is in (they used to be inline literals).
             const shortToken = new RegExp(s, f);
-            const chrome = new RegExp(`^(?:${langSrc}|Letter|Launcher|Memory|Challenge|Fuel|Progress|Loading)$`, 'iu');
+            const chrome = new RegExp(chromeSrc, chromeFlags);
             const shown = Array.from(document.querySelectorAll('h1,h2,h3')).map((h) => (h.textContent || '').trim())
                 .find((t) => shortToken.test(t) && !chrome.test(t)) || '';
-            const fm = body.match(/Fuel:\s*(\d+)\s*\/\s*(\d+)/i);
-            return { on: /Letter Launcher/i.test(body), shown, spoken: w.__spokenLetter, fx: fm ? +fm[1] : -1, fy: fm ? +fm[2] : -1 };
-        }, { s: SHORT_TOKEN.source, f: SHORT_TOKEN.flags, langSrc: ANY_LANGUAGE_LABEL.source });
+            const fm = body.match(new RegExp(fuelSrc, 'i'));
+            return { on: new RegExp(onSrc, 'i').test(body), shown, spoken: w.__spokenLetter, fx: fm ? +fm[1] : -1, fy: fm ? +fm[2] : -1 };
+        }, {
+            s: SHORT_TOKEN.source, f: SHORT_TOKEN.flags,
+            chromeSrc: launcherChrome.source, chromeFlags: launcherChrome.flags,
+            fuelSrc: fuelCounter.source, onSrc: letterLauncher.source,
+        });
     }
 
     /** Click the mic/prompt button (small square control in the game area). */
@@ -768,7 +938,7 @@ export class FoundationPage {
      */
     async completeLetterLauncher(maxRounds = 80): Promise<void> {
         await this.installLetterLauncherHook();
-        for (const label of ['Start Game', 'Skip Demo']) {
+        for (const label of this.copy.labels.practiceStart) {
             const b = this.page.getByText(label, { exact: true }).first();
             if (await b.isVisible({ timeout: 5000 }).catch(() => false)) { await b.click({ force: true }); await this.page.waitForTimeout(3000); break; }
         }
@@ -805,7 +975,7 @@ export class FoundationPage {
 
     /** True when on F3's "Memory Challenge" game. */
     async isOnMemoryChallenge(): Promise<boolean> {
-        return await this.page.evaluate(() => /Memory Challenge/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.memoryChallenge);
     }
 
     /** Read the sequence displayed on-screen during the memorize window. Handles both a
@@ -835,17 +1005,18 @@ export class FoundationPage {
             for (let w = 0; w < 60 && seq.length === 0; w++) {
                 seq = await this.displayedSequence();
                 if (seq.length) break;
-                if (w === 2) { const sg = this.page.getByText('Start Game', { exact: true }).first(); if (await sg.isVisible({ timeout: 150 }).catch(() => false)) { await sg.click({ force: true }); } }
+                if (w === 2) { const sg = this.page.getByText(this.copy.labels.startGame, { exact: true }).first(); if (await sg.isVisible({ timeout: 150 }).catch(() => false)) { await sg.click({ force: true }); } }
                 await this.page.waitForTimeout(80);
             }
             if (seq.length === 0) {
                 if (!(await this.isOnMemoryChallenge())) return;                    // advanced past MC
-                const full = await this.page.evaluate(() => { const m = document.body.innerText.match(/Progress:\s*(\d+)\s*\/\s*(\d+)/i); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; });
+                const progress = this.copy.progressCounter.source;
+                const full = await this.page.evaluate((src) => { const m = document.body.innerText.match(new RegExp(src, 'i')); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; }, progress);
                 if (full) return;                                                    // all rounds done
                 await this.captureState('memory-challenge-no-sequence'); return;
             }
             // Wait for the memorize display to end and the answer grid to be active.
-            for (let w = 0; w < 30; w++) { const ready = await this.page.evaluate(() => /Time Up/i.test(document.body.innerText) || /of \d+ letters/i.test(document.body.innerText)); if (ready) break; await this.page.waitForTimeout(150); }
+            for (let w = 0; w < 30; w++) { const ready = await this.pageTextMatchesAll(this.copy.sequenceGridReady); if (ready) break; await this.page.waitForTimeout(150); }
             await this.page.waitForTimeout(250);
             // Click the letters in the grid in the shown order.
             for (const L of seq) {
@@ -857,10 +1028,11 @@ export class FoundationPage {
             }
             // Submit via "Check Sequence" — click the actual button element (scrollIntoView
             // + native click); a text-locator click did not reliably trigger the handler.
-            await this.page.evaluate(() => {
-                const b = Array.from(document.querySelectorAll('button')).find((x) => /Check Sequence/i.test(x.textContent || ''));
+            await this.page.evaluate((src) => {
+                const submit = new RegExp(src, 'i');
+                const b = Array.from(document.querySelectorAll('button')).find((x) => submit.test(x.textContent || ''));
                 if (b) { (b as HTMLElement).scrollIntoView({ block: 'center' }); (b as HTMLElement).click(); }
-            });
+            }, this.copy.checkSequence.source);
             await this.page.waitForTimeout(2200);   // round registers + the next round's memorize begins
         }
     }
@@ -868,7 +1040,7 @@ export class FoundationPage {
     /** True when F3 has been completed — the app leaves F3 for the next-phase ("Words
      *  per minute" / "Start Level") journey map, so `foundationLevel` is no longer F3. */
     async isPastF3(): Promise<boolean> {
-        return await this.page.evaluate(() => /Words per minute|Words Learnt|Start Level/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.pastF3);
     }
 
     /**
@@ -900,7 +1072,7 @@ export class FoundationPage {
             // F3 launcher demo intro ("Captain Rahi! … our rocket needs fuel! — Skip Demo"),
             // shown when F3 is entered fresh (a resumed account skips straight to the game).
             // "Skip Demo" is not one of clickChallengeAdvance's matchers, so handle it here.
-            const introSkip = this.page.getByText(/^Skip Demo$/i).first();
+            const introSkip = this.page.getByText(this.copy.skipDemoExact).first();
             if (await introSkip.isVisible({ timeout: 500 }).catch(() => false)) {
                 await introSkip.click({ force: true }).catch(() => {});
                 for (let k = 0; k < 18; k++) { if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge() || await this.isOnApplyEntry() || await this.isPastF3()) break; await this.page.waitForTimeout(150); }
@@ -972,7 +1144,7 @@ export class FoundationPage {
 
     /** Non-throwing check for an Apply "Ready for Challenge?" entry screen. */
     async isOnApplyEntry(): Promise<boolean> {
-        return await this.page.evaluate(() => /Ready for Challenge/i.test(document.body.innerText));
+        return await this.pageTextMatchesAll(this.copy.readyForChallenge);
     }
 
     /** First ~200 chars of visible page text (single-line) — for diagnostics. */
@@ -995,26 +1167,25 @@ export class FoundationPage {
      */
     async recoverIfDisconnected(maxAttempts = 3): Promise<boolean> {
         const isDown = async (): Promise<boolean> =>
-            await this.page.evaluate(() =>
-                /Couldn'?t connect right now|check your internet connection/i.test(document.body.innerText))
-                .catch(() => false);
+            await this.pageTextMatchesAll(this.copy.connectionLost).catch(() => false);
 
         if (!await isDown()) return false;
 
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
             console.log(`[Foundation] ⚠️  app disconnected (likely a redeploy) — Try Again ${attempt}/${maxAttempts}`);
             // Click the connectivity page's own "Try Again" control.
-            const clicked = await this.page.evaluate(() => {
+            const clicked = await this.page.evaluate(({ s, f }) => {
+                const retry = new RegExp(s, f);
                 for (const el of Array.from(document.querySelectorAll('button, div, span, a'))) {
                     const t = ((el as HTMLElement).innerText || '').replace(/\s+/g, ' ').trim();
-                    if (!/^try again$/i.test(t)) continue;
+                    if (!retry.test(t)) continue;
                     const r = (el as HTMLElement).getBoundingClientRect();
                     if (r.width < 20 || r.height < 12) continue;
                     (el as HTMLElement).click();
                     return true;
                 }
                 return false;
-            }).catch(() => false);
+            }, { s: this.copy.tryAgainExact.source, f: this.copy.tryAgainExact.flags }).catch(() => false);
             if (!clicked) await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
             await this.page.waitForTimeout(6000);
             if (!await isDown()) {
@@ -1114,7 +1285,7 @@ export class FoundationPage {
      * "Next Level", and the final screen "Continue". Falls back to a centred clickable.
      */
     private async clickChallengeAdvance(): Promise<boolean> {
-        for (const re of FOUNDATION_TRANSITION_PRIORITY) {
+        for (const re of this.transitions) {
             const btn = this.page.getByText(re).first();
             if (await btn.isVisible({ timeout: 800 }).catch(() => false)) {
                 await btn.click({ force: true }).catch(() => {});
@@ -1154,7 +1325,7 @@ export class FoundationPage {
      * Game button that begins the Apply Letter Hunt.
      */
     async expectOnApplyChallenge(): Promise<void> {
-        await expect(this.page.getByText(/Ready for Challenge/i).first())
+        await expect(this.page.getByText(this.copy.readyForChallenge).first())
             .toBeVisible({ timeout: 20000 });
     }
 
@@ -1167,9 +1338,8 @@ export class FoundationPage {
     async expectPastApplyChallenge(): Promise<void> {
         await expect.poll(async () => {
             if ((await this.trainProgress()) !== '') return true;          // on the next Letter Train
-            return await this.page.evaluate(() =>
-                !/Ready for Challenge/i.test(document.body.innerText)
-                && /complete|congrat|well done|F2|Level 2|Foundation 2|Hurray/i.test(document.body.innerText));
+            return !(await this.pageTextMatchesAll(this.copy.readyForChallenge))
+                && await this.pageTextMatchesAll(this.copy.pastApplyMarkers);
         }, { timeout: 25000, message: 'expected to have advanced past the A3 Apply challenge' }).toBe(true);
     }
 
@@ -1191,8 +1361,7 @@ export class FoundationPage {
             if (await this.isOnApplyEntry()) return false;                 // still at an apply entry
             if ((await this.trainProgress()) !== '') return true;          // next Learn train
             if (await this.startFoundationButton().isVisible({ timeout: 500 }).catch(() => false)) return true; // "Start F#"
-            return await this.page.evaluate(() =>
-                /complete|congrat|well done|Foundation|Level \d|Start F\d/i.test(document.body.innerText));
+            return await this.pageTextMatchesAll(this.copy.applyCompletedMarkers);
         }, { timeout: 30000, message: 'expected to have completed the final Apply and advanced past it' }).toBe(true);
     }
 

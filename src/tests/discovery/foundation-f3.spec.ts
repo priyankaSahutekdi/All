@@ -24,7 +24,7 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
     test('TC-021 / TC-022 F3: login → English → complete F3 (P1 → A3)', async ({ page, accounts, lang }) => {
         test.setTimeout(50 * 60 * 1000);
 
-        const foundation = new FoundationPage(page);
+        const foundation = new FoundationPage(page, lang);
 
         await test.step('Login as the F3 account and resume F3 in English', async () => {
             await resumeParkedAccount(page, foundation, {

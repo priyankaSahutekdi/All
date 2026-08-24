@@ -21,7 +21,7 @@ import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
  */
 
 test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, single login)', () => {
-    test('TC-001 to TC-013: discovery flow then F1 entry', async ({ page, discoveryData }) => {
+    test('TC-001 to TC-013: discovery flow then F1 entry', async ({ page, discoveryData, lang }) => {
         test.setTimeout(75 * 60 * 1000); // up to 75 min (deep F1 flow: Discovery + L1–L9/P1–P9 + A1–A3)
 
         // Per-language literal, loaded at runtime from testdata/<lang>/discovery-data.json.
@@ -32,7 +32,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         const loginPage = new DiscoveryLoginPage(page);
         const micPage = new MicrophoneTestPage(page);
         const assess = new AssessmentPage(page);
-        const foundation = new FoundationPage(page);
+        const foundation = new FoundationPage(page, lang);
         const user = DiscoveryHelper.createTestUser();
         console.log(`[E2E] single user: ${user.username} (password == username)`);
 
