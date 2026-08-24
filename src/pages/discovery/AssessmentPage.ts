@@ -1,63 +1,45 @@
 import { expect, Page } from '@playwright/test';
 import { AppLanguage, languageByCode } from '../../utils/languages';
-import { copy, copyRe, lazyProp } from '../../utils/UiCopy';
+import { copy, copyRe } from '../../utils/uiCopy';
 import { TRANSITION_KEYS } from '../../utils/transitions';
-import { recordToggleCenterClosure } from '../../utils/GeometryLocator';
-
-/** The shape `assessmentPatterns` resolves, one key per on-screen string this page matches. */
-export interface AssessmentCopy {
-    completionPopup: RegExp;
-    letsStart: RegExp;
-    continueExact: RegExp;
-    labels: {
-        startAssessment: string;
-        skipDemo: string;
-        startGame: string;
-        confirm: string;
-    };
-}
 
 /**
  * Every on-screen string this page object matches, resolved for one language.
  *
- * Each key is defined via `lazyProp` (`uiCopy.ts`) — resolved on first read, not eagerly here —
- * so a language missing a translation only throws when something actually reads that key, not
- * at construction. Exported so the English-equivalence check can compare each pattern against
- * the inline literal it replaced. See `foundationPatterns` in FoundationPage.ts for the same
- * shape and the reasons behind it (no fallback to English on a missing translation).
+ * Exported so the English-equivalence check can compare each pattern against the inline literal
+ * it replaced. See `foundationPatterns` in FoundationPage.ts for the same shape and the reasons
+ * behind it (built once, throws on a missing translation rather than falling back to English).
  */
-export function assessmentPatterns(lang: AppLanguage): AssessmentCopy {
+export function assessmentPatterns(lang: AppLanguage) {
     const K = TRANSITION_KEYS;
-    const p = {} as AssessmentCopy;
+    return {
+        /**
+         * The completion popup's celebration message. `successfully completed` /
+         * `completed assessment` are the popup's own phrases, deliberately narrower than
+         * FoundationPage's `successfully` / `complete` stems.
+         */
+        completionPopup: copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang),
+        letsStart: copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }),
+        /**
+         * Anchored and CASE-SENSITIVE (`flags: ''`), reproducing the inline
+         * `/^Continue$|जारी रखें/` for English exactly.
+         *
+         * That literal also matched the Hindi wording during an ENGLISH run, which this
+         * deliberately no longer does — matching another language's text is the false positive
+         * the LANG axis exists to prevent, and it would make a mis-switched run look healthy.
+         * The Hindi wording is not lost: it is now `continueLabel.hindi` in the registry, so a
+         * Hindi run gets it and an English run does not.
+         */
+        continueExact: copyRe(K.continue, lang, { exact: true, flags: '' }),
 
-    /**
-     * The completion popup's celebration message. `successfully completed` /
-     * `completed assessment` are the popup's own phrases, deliberately narrower than
-     * FoundationPage's `successfully` / `complete` stems.
-     */
-    lazyProp(p, 'completionPopup', () => copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang));
-    lazyProp(p, 'letsStart', () => copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }));
-    /**
-     * Anchored and CASE-SENSITIVE (`flags: ''`), reproducing the inline
-     * `/^Continue$|जारी रखें/` for English exactly.
-     *
-     * That literal also matched the Hindi wording during an ENGLISH run, which this
-     * deliberately no longer does — matching another language's text is the false positive
-     * the LANG axis exists to prevent, and it would make a mis-switched run look healthy.
-     * The Hindi wording is not lost: it is now `continueLabel.hindi` in the registry, so a
-     * Hindi run gets it and an English run does not.
-     */
-    lazyProp(p, 'continueExact', () => copyRe(K.continue, lang, { exact: true, flags: '' }));
-
-    /** Plain labels, for the `getByText(exact)` call sites. */
-    lazyProp(p, 'labels', () => ({
-        startAssessment: copy('startAssessment', lang)[0],
-        skipDemo: copy(K.skipDemo, lang)[0],
-        startGame: copy(K.startGame, lang)[0],
-        confirm: copy('confirm', lang)[0],
-    }));
-
-    return p;
+        /** Plain labels, for the `getByText(exact)` call sites. */
+        labels: {
+            startAssessment: copy('startAssessment', lang)[0],
+            skipDemo: copy(K.skipDemo, lang)[0],
+            startGame: copy(K.startGame, lang)[0],
+            confirm: copy('confirm', lang)[0],
+        },
+    };
 }
 
 /**
@@ -129,7 +111,27 @@ export class AssessmentPage {
      * graphic horizontally centred below the sentence. Returns null if not present.
      */
     async recordToggleCenter(): Promise<{ x: number; y: number } | null> {
-        return await this.page.evaluate(recordToggleCenterClosure());
+        return await this.page.evaluate(() => {
+            // The toggle is a small, roughly-square, horizontally-centred clickable.
+            // Idle = green mic (has <svg>); recording = red circle (often NO svg child).
+            // We therefore do NOT require an svg, but keep it round and centred and
+            // pick the SMALLEST such element (the button, not its container/waveform).
+            let best: { x: number; y: number; w: number } | null = null;
+            for (const n of Array.from(document.querySelectorAll('div, button, svg'))) {
+                const el = n as HTMLElement;
+                const r = el.getBoundingClientRect();
+                const cx = r.x + r.width / 2;
+                const cy = r.y + r.height / 2;                  // use CENTRE, not top
+                if (cx < 590 || cx > 690) continue;             // centre column
+                if (cy < 285 || cy > 410) continue;             // mic/stop zone (excludes Next @~426)
+                if (r.width < 30 || r.width > 95) continue;     // round button size
+                const ratio = r.height / (r.width || 1);
+                if (ratio < 0.6 || ratio > 1.5) continue;       // roughly square/round
+                if (getComputedStyle(el).cursor !== 'pointer') continue;
+                if (!best || r.width < best.w) best = { x: cx, y: cy, w: r.width };
+            }
+            return best ? { x: best.x, y: best.y } : null;
+        });
     }
 
     /** Click the centred record/stop toggle (coordinate-based; viewport is fixed). */

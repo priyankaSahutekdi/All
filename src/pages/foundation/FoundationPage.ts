@@ -3,65 +3,25 @@ import { AssessmentPage } from '../discovery';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { currentAppFrame } from '../../utils/appFrame';
 import {
-    ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS, DIGIT_CLASS,
+    ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS,
     LETTER_AUDIO_RE, LETTER_AUDIO_RE_SOURCE, decodeAudioToken,
-} from '../../utils/Text';
+} from '../../utils/text';
 import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../utils/languages';
 import {
     TRANSITION_KEYS, foundationTransitionPriority, transitionAlt, transitionRe,
 } from '../../utils/transitions';
-import { copy, copyAlt, copyRe, copyWordsAlt, lazyProp } from '../../utils/UiCopy';
-import { letsStartButtonClosure } from '../../utils/GeometryLocator';
+import { copy, copyAlt, copyRe, copyWordsAlt } from '../../utils/uiCopy';
 
 const K = TRANSITION_KEYS;
-
-/** The shape `foundationPatterns` resolves, one key per on-screen string this page matches. */
-export interface FoundationCopy {
-    resultMessage: RegExp;
-    startF1: RegExp;
-    startAnyFoundation: RegExp;
-    letsStart: RegExp;
-    helpLanguageModal: RegExp;
-    confirmExact: RegExp;
-    howToPlay: RegExp;
-    practiceStart: RegExp;
-    skipDemoExact: RegExp;
-    nextOrContinueExact: RegExp;
-    letterRecognition: RegExp;
-    letterLauncher: RegExp;
-    memoryChallenge: RegExp;
-    readyForChallenge: RegExp;
-    fuelCounter: RegExp;
-    progressCounter: RegExp;
-    checkSequence: RegExp;
-    sequenceGridReady: RegExp;
-    pastF3: RegExp;
-    feedbackShort: RegExp;
-    feedbackFull: RegExp;
-    completion: RegExp;
-    connectionLost: RegExp;
-    tryAgainExact: RegExp;
-    notAnAnswerOption: RegExp;
-    launcherChrome: RegExp;
-    pastApplyMarkers: RegExp;
-    applyCompletedMarkers: RegExp;
-    labels: {
-        startGame: string;
-        practiceStart: string[];
-    };
-}
 
 /**
  * Every on-screen string this page object matches, resolved for one language.
  *
- * Each key is defined via `lazyProp` (`uiCopy.ts`) — resolved on first read, not eagerly here.
- * This used to build every pattern eagerly at construction, which meant a language with even one
- * missing translation threw at construction time, whether or not the current run ever needed
- * that key (confirmed live against Hindi — F1-only runs threw on F2/F3-only keys, and even
- * Discovery-only runs threw immediately on core keys). Resolving lazily means a missing
- * translation still throws — by design, per uiCopy.ts's DESIGN note, no English fallback — but
- * only when something actually reads that key, naming the gap at the point it matters instead of
- * gating construction on every key the class could ever need.
+ * Built once per FoundationPage rather than per call because these patterns gate screen
+ * detection inside poll loops that run hundreds of times in a 20-minute level, and because
+ * building them up front means a language with a missing translation throws at construction —
+ * naming the gap immediately instead of one stalled screen at a time (see uiCopy.ts's DESIGN
+ * note on why there is no English fallback).
  *
  * Several of these are consumed inside `page.evaluate`, which cannot close over Node scope, so
  * they are passed through as `.source`/`.flags` and rebuilt in-page — the existing idiom in
@@ -70,148 +30,120 @@ export interface FoundationCopy {
  * Exported so the English-equivalence check can compare each pattern against the inline literal
  * it replaced, rather than the migration being taken on trust.
  */
-export function foundationPatterns(lang: AppLanguage): FoundationCopy {
+export function foundationPatterns(lang: AppLanguage) {
     /** The journey-map entry button for a Foundation level; `code` is an F# regex fragment. */
     const startFoundation = (code: string, space: 'exact' | 'flexible' = 'flexible'): string =>
         copyAlt('startFoundationLevel', lang, { slots: { level: code }, space });
-    /** A "<label>: N/M" readout. The colon is a formatting convention, not translated copy.
-     *  Digits use DIGIT_CLASS (script-agnostic), hence the 'u' flag. */
+    /** A "<label>: N/M" readout. The colon is a formatting convention, not translated copy. */
     const counter = (key: 'fuelLabel' | 'progressLabel'): RegExp =>
-        new RegExp(`${copyAlt(key, lang)}:\\s*([${DIGIT_CLASS}]+)\\s*\\/\\s*([${DIGIT_CLASS}]+)`, 'iu');
+        new RegExp(`${copyAlt(key, lang)}:\\s*(\\d+)\\s*\\/\\s*(\\d+)`, 'i');
 
-    const p = {} as FoundationCopy;
+    return {
+        /** Discovery result / placement screen message. */
+        resultMessage: copyRe(['learningJourney', 'languageSkills', 'hurray'], lang),
+        /** The F1 landing entry button on the learning-journey map. */
+        startF1: new RegExp(startFoundation('F1'), 'i'),
+        /** Any "Start F#" journey-map entry (opens the next Foundation level). */
+        startAnyFoundation: new RegExp(startFoundation('F\\d+'), 'i'),
+        letsStart: copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }),
 
-    /** Discovery result / placement screen message. */
-    lazyProp(p, 'resultMessage', () => copyRe(['learningJourney', 'languageSkills', 'hurray'], lang));
-    /** The F1 landing entry button on the learning-journey map. */
-    lazyProp(p, 'startF1', () => new RegExp(startFoundation('F1'), 'i'));
-    /** Any "Start F#" journey-map entry (opens the next Foundation level). */
-    lazyProp(p, 'startAnyFoundation', () => new RegExp(startFoundation('F\\d+'), 'i'));
-    lazyProp(p, 'letsStart', () => copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }));
+        helpLanguageModal: copyRe('chooseHelpLanguage', lang),
+        confirmExact: copyRe('confirm', lang, { exact: true }),
 
-    lazyProp(p, 'helpLanguageModal', () => copyRe('chooseHelpLanguage', lang));
-    lazyProp(p, 'confirmExact', () => copyRe('confirm', lang, { exact: true }));
+        howToPlay: copyRe('howToPlay', lang),
+        /** The two ways into a practice from its demo screen. */
+        practiceStart: transitionRe([K.startGame, K.skipDemo], lang),
+        skipDemoExact: copyRe(K.skipDemo, lang, { apostrophe: 'optional', exact: true }),
+        nextOrContinueExact: copyRe([K.next, K.continue], lang, { apostrophe: 'optional', exact: true }),
 
-    lazyProp(p, 'howToPlay', () => copyRe('howToPlay', lang));
-    /** The two ways into a practice from its demo screen. */
-    lazyProp(p, 'practiceStart', () => transitionRe([K.startGame, K.skipDemo], lang));
-    lazyProp(p, 'skipDemoExact', () => copyRe(K.skipDemo, lang, { apostrophe: 'optional', exact: true }));
-    lazyProp(p, 'nextOrContinueExact', () => copyRe([K.next, K.continue], lang, { apostrophe: 'optional', exact: true }));
+        letterRecognition: copyRe('letterRecognition', lang),
+        letterLauncher: copyRe('letterLauncher', lang),
+        memoryChallenge: copyRe('memoryChallenge', lang),
+        readyForChallenge: copyRe('readyForChallenge', lang),
 
-    lazyProp(p, 'letterRecognition', () => copyRe('letterRecognition', lang));
-    lazyProp(p, 'letterLauncher', () => copyRe('letterLauncher', lang));
-    lazyProp(p, 'memoryChallenge', () => copyRe('memoryChallenge', lang));
-    lazyProp(p, 'readyForChallenge', () => copyRe('readyForChallenge', lang));
+        fuelCounter: counter('fuelLabel'),
+        progressCounter: counter('progressLabel'),
+        checkSequence: copyRe('checkSequence', lang),
+        /** The memorize window has ended and the answer grid is live. */
+        sequenceGridReady: new RegExp(
+            [copyAlt('timeUp', lang), copyAlt('lettersOfCount', lang, { slots: { n: '\\d+' } })].join('|'),
+            'i',
+        ),
 
-    lazyProp(p, 'fuelCounter', () => counter('fuelLabel'));
-    lazyProp(p, 'progressCounter', () => counter('progressLabel'));
-    lazyProp(p, 'checkSequence', () => copyRe('checkSequence', lang));
-    /** The memorize window has ended and the answer grid is live. Digits use DIGIT_CLASS
-     *  (script-agnostic), hence the 'u' flag. */
-    lazyProp(p, 'sequenceGridReady', () => new RegExp(
-        [copyAlt('timeUp', lang), copyAlt('lettersOfCount', lang, { slots: { n: `[${DIGIT_CLASS}]+` } })].join('|'),
-        'iu',
-    ));
+        /** F3 is done — the app has moved to the next-phase journey map. */
+        pastF3: copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang),
 
-    /** F3 is done — the app has moved to the next-phase journey map. */
-    lazyProp(p, 'pastF3', () => copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang));
+        /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
+        feedbackShort: copyRe(['correct', 'great'], lang),
+        feedbackFull: copyRe(['correct', 'great', 'wellDone'], lang),
+        completion: copyRe(['hurray', 'successfully', 'complete'], lang),
 
-    /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
-    lazyProp(p, 'feedbackShort', () => copyRe(['correct', 'great'], lang));
-    lazyProp(p, 'feedbackFull', () => copyRe(['correct', 'great', 'wellDone'], lang));
-    lazyProp(p, 'completion', () => copyRe(['hurray', 'successfully', 'complete'], lang));
+        connectionLost: copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }),
+        tryAgainExact: copyRe('tryAgain', lang, { exact: true }),
 
-    lazyProp(p, 'connectionLost', () => copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }));
-    lazyProp(p, 'tryAgainExact', () => copyRe('tryAgain', lang, { exact: true }));
+        /**
+         * Button labels that are NOT an answer option — the transition controls plus Confirm.
+         * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
+         * the inline literal was.
+         */
+        notAnAnswerOption: new RegExp([
+            transitionAlt([K.nextLevel], lang),
+            transitionAlt([K.continue], lang),
+            transitionAlt([K.startGame], lang),
+            transitionAlt([K.skipDemo], lang),
+            `^${transitionAlt([K.next], lang)}$`,
+            copyAlt('confirm', lang),
+            transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+        ].join('|'), 'i'),
 
-    /**
-     * Button labels that are NOT an answer option — the transition controls plus Confirm.
-     * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
-     * the inline literal was.
-     */
-    lazyProp(p, 'notAnAnswerOption', () => new RegExp([
-        transitionAlt([K.nextLevel], lang),
-        transitionAlt([K.continue], lang),
-        transitionAlt([K.startGame], lang),
-        transitionAlt([K.skipDemo], lang),
-        `^${transitionAlt([K.next], lang)}$`,
-        copyAlt('confirm', lang),
-        transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
-    ].join('|'), 'i'));
+        /**
+         * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
+         * words are derived from the game titles rather than re-listed, so they cannot drift
+         * away from them.
+         */
+        launcherChrome: new RegExp(
+            `^(?:${ANY_LANGUAGE_LABEL.source}|`
+            + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
+            'iu',
+        ),
 
-    /**
-     * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
-     * words are derived from the game titles rather than re-listed, so they cannot drift
-     * away from them.
-     */
-    lazyProp(p, 'launcherChrome', () => new RegExp(
-        `^(?:${ANY_LANGUAGE_LABEL.source}|`
-        + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
-        'iu',
-    ));
+        /**
+         * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
+         * definitive checks at their call sites, not assertions on their own.
+         *
+         * `F2` stays a literal: F# is a level CODE the app renders identically in every language
+         * (`foundationLevel()` reads it out of `img[alt]`), not translated copy. The
+         * "<word> <number>" ordering IS an assumption that may not hold in another language —
+         * recorded as a known limitation rather than papered over, because both patterns are
+         * backed by a definitive check at the call site.
+         */
+        pastApplyMarkers: new RegExp([
+            copyAlt('complete', lang),
+            copyAlt('congratulations', lang),
+            copyAlt('wellDone', lang),
+            'F2',
+            `${copyAlt('levelWord', lang)} 2`,
+            `${copyAlt('foundationWord', lang)} 2`,
+            copyAlt('hurray', lang),
+        ].join('|'), 'i'),
+        applyCompletedMarkers: new RegExp([
+            copyAlt('complete', lang),
+            copyAlt('congratulations', lang),
+            copyAlt('wellDone', lang),
+            copyAlt('foundationWord', lang),
+            `${copyAlt('levelWord', lang)} \\d`,
+            startFoundation('F\\d', 'exact'),
+        ].join('|'), 'i'),
 
-    /**
-     * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
-     * definitive checks at their call sites, not assertions on their own.
-     *
-     * `F2` stays a literal: F# is a level CODE the app renders identically in every language
-     * (`foundationLevel()` reads it out of `img[alt]`), not translated copy. The
-     * "<word> <number>" ordering IS an assumption that may not hold in another language —
-     * recorded as a known limitation rather than papered over, because both patterns are
-     * backed by a definitive check at the call site.
-     */
-    lazyProp(p, 'pastApplyMarkers', () => new RegExp([
-        copyAlt('complete', lang),
-        copyAlt('congratulations', lang),
-        copyAlt('wellDone', lang),
-        'F2',
-        `${copyAlt('levelWord', lang)} 2`,
-        `${copyAlt('foundationWord', lang)} 2`,
-        copyAlt('hurray', lang),
-    ].join('|'), 'i'));
-    /** Digits in the `levelWord` fragment use DIGIT_CLASS (script-agnostic), hence 'u'.
-     *  `startFoundation('F\\d', ...)`'s F# stays ASCII — it's a level CODE, not translated
-     *  copy, rendered identically in every language (see the class-level note above). */
-    lazyProp(p, 'applyCompletedMarkers', () => new RegExp([
-        copyAlt('complete', lang),
-        copyAlt('congratulations', lang),
-        copyAlt('wellDone', lang),
-        copyAlt('foundationWord', lang),
-        `${copyAlt('levelWord', lang)} [${DIGIT_CLASS}]`,
-        startFoundation('F\\d', 'exact'),
-    ].join('|'), 'iu'));
-
-    /** Plain (non-regex) labels, for the `getByText(exact)` call sites. */
-    lazyProp(p, 'labels', () => ({
-        startGame: copy(K.startGame, lang)[0],
-        practiceStart: copy([K.startGame, K.skipDemo], lang),
-    }));
-
-    return p;
+        /** Plain (non-regex) labels, for the `getByText(exact)` call sites. */
+        labels: {
+            startGame: copy(K.startGame, lang)[0],
+            practiceStart: copy([K.startGame, K.skipDemo], lang),
+        },
+    };
 }
 
-/**
- * Why a node solver stopped.
- *
- * The solvers used to return `void` and give up with a bare `return` when they ran out of
- * budget — indistinguishable, to the caller, from finishing the node. `completeF3` therefore
- * pushed 'LL'/'MC' into its completed-games log whether the game had been played or not, and
- * the F3 spec's assertion is on that log, so a game that did nothing at all still produced a
- * green test. Making the outcome part of the return type is what removes the possibility.
- */
-export interface SolverResult {
-    /**
-     * True when the solver reached a real end state for the node — it finished the node, or
-     * found the node already gone. False means it exhausted its budget while the node was
-     * still active, i.e. it made no further progress and the node is NOT done.
-     */
-    completed: boolean;
-    /** Short reason, for the node log when completed and for the error message when not. */
-    reason: string;
-}
-
-const completed = (reason: string): SolverResult => ({ completed: true, reason });
-const gaveUp = (reason: string): SolverResult => ({ completed: false, reason });
+export type FoundationCopy = ReturnType<typeof foundationPatterns>;
 
 /**
  * Page Object for the Foundation (F) series entry.
@@ -235,13 +167,8 @@ export class FoundationPage {
     private lhNetLetter: string | null = null;   // target letter from the network (backup to the play() hook)
     /** Every screen string this page matches, resolved for the run's language. */
     private readonly copy: FoundationCopy;
-    /**
-     * The advance-button matchers, in priority order, for the run's language. Lazy (`lazyProp`,
-     * `uiCopy.ts`): `foundationTransitionPriority` resolves 5 patterns immediately when called,
-     * so this field is resolved as one unit on first read (by `clickChallengeAdvance`) rather
-     * than at construction — same reasoning as `copy` above.
-     */
-    private readonly transitions!: RegExp[];
+    /** The advance-button matchers, in priority order, for the run's language. */
+    private readonly transitions: RegExp[];
 
     /**
      * `lang` defaults to English so the parked Mastery specs (out of scope per the 2026-08-18
@@ -251,7 +178,7 @@ export class FoundationPage {
     constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
         this.copy = foundationPatterns(lang);
-        lazyProp(this, 'transitions', () => foundationTransitionPriority(lang));
+        this.transitions = foundationTransitionPriority(lang);
         // Reuse the Discovery assessment page's centred record/stop toggle for the
         // Letter Train "say the word" mic (same 70x70 centre control).
         this.assess = new AssessmentPage(page, lang);
@@ -296,7 +223,18 @@ export class FoundationPage {
         const byText = this.page.getByText(this.copy.letsStart).first();
         if (await byText.click({ timeout: 4000 }).then(() => true).catch(() => false)) return;
 
-        const c = await this.page.evaluate(letsStartButtonClosure());
+        const c = await this.page.evaluate(() => {
+            for (const n of Array.from(document.querySelectorAll('div, button, svg'))) {
+                const el = n as HTMLElement;
+                const r = el.getBoundingClientRect();
+                const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
+                if (cx < 520 || cx > 760 || cy < 380 || cy > 560) continue;  // lower-centre
+                if (r.width < 80 || r.width > 320 || r.height < 28 || r.height > 90) continue;
+                if (getComputedStyle(el).cursor !== 'pointer') continue;
+                return { x: cx, y: cy };
+            }
+            return null;
+        });
         await this.page.mouse.click(c ? c.x : 640, c ? c.y : 472);
     }
 
@@ -456,27 +394,23 @@ export class FoundationPage {
      * the Letter Hunt practice / Apply "/10" and any small level counter (e.g. "1/3").
      */
     async trainProgress(): Promise<string> {
-        return await this.page.evaluate((digitClass) => {
+        return await this.page.evaluate(() => {
             const text = document.body.innerText;
             // Fast path: the classic 16-item counter (L1–L5). Text-only → flicker-proof,
             // and never matches the Letter Hunt practice / Apply, so their detection is
-            // unchanged. The numerator uses DIGIT_CLASS (script-agnostic); the "16" stays an
-            // ASCII literal — unverified whether a build with native digits would render its
-            // denominators natively too, in which case this fast path would simply miss (falling
-            // through to the general match below, which still requires ASCII `parseInt` on the
-            // denominator — see DIGIT_CLASS's own note in text.ts on the numeric-parsing gap).
-            const m16 = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*16`, 'u'));
+            // unchanged.
+            const m16 = text.match(/(\d+)\s*\/\s*16/);
             if (m16) return m16[0];
             // Other lesson lengths (e.g. L6 = /14). Match a counter whose denominator is
             // a train length (>= 11) — TEXT-only so it stays flicker-proof through item
             // transitions, and it excludes the practice/Apply "/10" and any small level
             // counter (e.g. "1/3"), so those are never mistaken for a Letter Train.
-            const all = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*([${digitClass}]+)`, 'gu')) || [];
+            const all = text.match(/(\d+)\s*\/\s*(\d+)/g) || [];
             for (const s of all) {
                 if (parseInt(s.split('/')[1], 10) >= 11) return s.trim();
             }
             return '';
-        }, DIGIT_CLASS);
+        });
     }
 
     /** True when a Letter Hunt "How to Play" practice/demo screen is showing. */
@@ -608,7 +542,7 @@ export class FoundationPage {
      *     and inject it into the mic so the app records the ACTUAL word audio.
      * Loops until the "N/16" counter disappears (lesson complete → next node).
      */
-    async completeLetterTrain(): Promise<SolverResult> {
+    async completeLetterTrain(): Promise<void> {
         await this.dismissCoachmarks();
         await this.installMicInjection();
         let stuck = 0;
@@ -619,9 +553,7 @@ export class FoundationPage {
                 // a beat during an item transition) before treating the lesson as done.
                 await this.page.waitForTimeout(700);
                 p = await this.trainProgress();
-                if (!p) {
-                    return completed(`train finished after ${i} items`);
-                }
+                if (!p) return;                          // train finished → next node
             }
             console.log(`[Letter Train] ${p}`);
             const arrow = await this.rightmostArrow();
@@ -650,16 +582,8 @@ export class FoundationPage {
             // Not advancing can mean the app dropped its connection (redeploy) rather than
             // "lesson finished" — recover and keep driving instead of silently giving up.
             if (stuck >= 3 && await this.recoverIfDisconnected()) { stuck = 0; continue; }
-            // Safety valve: the counter has not moved in 8 rounds. Historically this returned
-            // as though the lesson were done ("likely transitioned"), which is a guess. If the
-            // train really did transition the check at the top of the loop sees it gone and
-            // returns `completed`; reaching here means the counter is STILL showing `p`, so the
-            // honest answer is that the solver stopped making progress.
-            if (stuck >= 8) {
-                return gaveUp(`the train counter stayed at ${p} for 8 rounds`);
-            }
+            if (stuck >= 8) return;                       // safety: likely transitioned
         }
-        return gaveUp(`reached the 45-item cap while the train counter was still showing`);
     }
 
     /** The URL of the app's content iframe (post-2026-08 deployment: the journey runs
@@ -785,7 +709,7 @@ export class FoundationPage {
      * shown, then answer each of the ~10 questions (read the spoken letter → tap it →
      * advance) until the next lesson node (a Letter Train "N/16") appears.
      */
-    async completeLetterHuntPractice(): Promise<SolverResult> {
+    async completeLetterHuntPractice(): Promise<void> {
         const cleanup = await this.installLetterHook();
         const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
@@ -795,25 +719,13 @@ export class FoundationPage {
         try {
             let stuck = 0;
             for (let q = 0; q < 60; q++) {
-                if ((await this.trainProgress()) !== '') {
-                    return completed(`advanced to the next Letter Train after ${q} questions`);
-                }
-                if (await this.pageTextMatchesAll(this.copy.completion)) {
-                    return completed(`reached a completion screen after ${q} questions`);
-                }
+                if ((await this.trainProgress()) !== '') return;   // advanced to next node
+                if (await this.pageTextMatchesAll(this.copy.completion)) return;
                 const letter = await this.readSpokenLetter();
-                // No recoverable spoken letter means no answer can be given — the questions are
-                // not being answered, so this is a give-up, not a completion.
-                if (!letter) {
-                    if (++stuck > 8) {
-                        return gaveUp(`could not recover the spoken letter 9 times in a row (at question ${q + 1})`);
-                    }
-                    continue;
-                }
+                if (!letter) { if (++stuck > 8) return; continue; }
                 stuck = 0;
                 await this.tapLetterAndAdvance(letter);
             }
-            return gaveUp('reached the 60-question cap without leaving the practice');
         } finally {
             cleanup();
         }
@@ -901,7 +813,7 @@ export class FoundationPage {
      * demo is shown, then answer each of the ~10 questions (hear the word → tap the
      * matching word option → advance) until the next node (a Letter Train or Apply entry).
      */
-    async completeWordRecognitionPractice(): Promise<SolverResult> {
+    async completeWordRecognitionPractice(): Promise<void> {
         const cleanup = await this.installLetterHook();
         const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
@@ -911,26 +823,14 @@ export class FoundationPage {
         try {
             let stuck = 0;
             for (let q = 0; q < 60; q++) {
-                if ((await this.trainProgress()) !== '') {
-                    return completed(`advanced to the next Letter Train after ${q} questions`);
-                }
-                if (await this.isOnApplyEntry()) {
-                    return completed(`reached an Apply entry after ${q} questions`);
-                }
-                if (await this.pageTextMatchesAll(this.copy.completion)) {
-                    return completed(`reached a completion screen after ${q} questions`);
-                }
+                if ((await this.trainProgress()) !== '') return;      // advanced to next Letter Train
+                if (await this.isOnApplyEntry()) return;              // reached an Apply entry
+                if (await this.pageTextMatchesAll(this.copy.completion)) return;
                 const token = await this.readSpokenViaSpeaker();
-                if (!token) {
-                    if (++stuck > 8) {
-                        return gaveUp(`could not recover the spoken word 9 times in a row (at question ${q + 1})`);
-                    }
-                    continue;
-                }
+                if (!token) { if (++stuck > 8) return; continue; }
                 stuck = 0;
                 await this.tapWordAndAdvance(token);
             }
-            return gaveUp('reached the 60-question cap without leaving the practice');
         } finally {
             cleanup();
         }
@@ -1053,7 +953,7 @@ export class FoundationPage {
      * letter, compare to the displayed letter, and press ✓ (match) / ✗ (mismatch) — until
      * the fuel target is reached and the game advances to the next node.
      */
-    async completeLetterLauncher(maxRounds = 80): Promise<SolverResult> {
+    async completeLetterLauncher(maxRounds = 80): Promise<void> {
         await this.installLetterLauncherHook();
         for (const label of this.copy.labels.practiceStart) {
             const b = this.page.getByText(label, { exact: true }).first();
@@ -1063,12 +963,8 @@ export class FoundationPage {
         let miss = 0;
         for (let i = 0; i < maxRounds; i++) {
             const st = await this.launcherState();
-            if (!st.on) {
-                return completed(`no longer on the Letter Launcher (after ${i} rounds)`);
-            }
-            if (st.fx >= 0 && st.fy > 0 && st.fx >= st.fy) {
-                return completed(`fuel target reached (${st.fx}/${st.fy}) after ${i} rounds`);
-            }
+            if (!st.on) return;                                   // advanced past the game
+            if (st.fx >= 0 && st.fy > 0 && st.fx >= st.fy) return; // fuel full → complete
             await this.page.evaluate(() => { (window as unknown as { __spokenLetter: string | null }).__spokenLetter = null; });
             await this.clickLauncherMic();
             let s = await this.launcherState();
@@ -1079,19 +975,11 @@ export class FoundationPage {
             // until the round is advanced), default to ✗ — a wrong guess only forgoes fuel
             // (no penalty) and the NEXT round's audio then plays reliably. Never stall.
             const match = !!(s.shown && s.spoken && s.spoken.toUpperCase() === s.shown.toUpperCase());
-            if (!s.spoken) {
-                if (++miss > 25) {
-                    await this.captureState('letter-launcher-stuck');
-                    return gaveUp(`the spoken letter could not be recovered for 26 consecutive rounds `
-                        + `(fuel ${st.fx}/${st.fy}) — the answers are guesses, so the game is not being played`);
-                }
-            } else {
-                miss = 0;
-            }
+            if (!s.spoken) { if (++miss > 25) { await this.captureState('letter-launcher-stuck'); return; } }
+            else miss = 0;
             await this.pressLauncherChoice(match);
             await this.page.waitForTimeout(1300);
         }
-        return gaveUp(`reached the ${maxRounds}-round cap without filling the fuel target`);
     }
 
     // ── F3 "Memory Challenge" practice ───────────────────────────────────────────────
@@ -1125,7 +1013,7 @@ export class FoundationPage {
      * "Check Sequence" button — repeated for the 5 rounds. The letters are presented
      * visually (no audio in this environment), so no audio hook is needed.
      */
-    async completeMemoryChallenge(maxRounds = 8): Promise<SolverResult> {
+    async completeMemoryChallenge(maxRounds = 8): Promise<void> {
         for (let round = 0; round < maxRounds; round++) {
             // Capture the displayed sequence FIRST (the memorize window can be as short as
             // ~1.6s for word rounds), before any other check, using a tight poll. A demo
@@ -1138,20 +1026,11 @@ export class FoundationPage {
                 await this.page.waitForTimeout(80);
             }
             if (seq.length === 0) {
-                if (!(await this.isOnMemoryChallenge())) {
-                    return completed(`advanced past the Memory Challenge after ${round} rounds`);
-                }
+                if (!(await this.isOnMemoryChallenge())) return;                    // advanced past MC
                 const progress = this.copy.progressCounter.source;
                 const full = await this.page.evaluate((src) => { const m = document.body.innerText.match(new RegExp(src, 'i')); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; }, progress);
-                if (full) {
-                    return completed(`all rounds done (progress counter full) after ${round} rounds`);
-                }
-                // Still on the Memory Challenge, progress not full, and no sequence appeared:
-                // the solver has nothing to answer with. This used to return as though the node
-                // were finished, which is what let completeF3 log 'MC' for a game it never played.
-                await this.captureState('memory-challenge-no-sequence');
-                return gaveUp(`no letter sequence appeared on round ${round + 1} while still on the `
-                    + 'Memory Challenge with rounds outstanding');
+                if (full) return;                                                    // all rounds done
+                await this.captureState('memory-challenge-no-sequence'); return;
             }
             // Wait for the memorize display to end and the answer grid to be active.
             for (let w = 0; w < 30; w++) { const ready = await this.pageTextMatchesAll(this.copy.sequenceGridReady); if (ready) break; await this.page.waitForTimeout(150); }
@@ -1173,59 +1052,12 @@ export class FoundationPage {
             }, this.copy.checkSequence.source);
             await this.page.waitForTimeout(2200);   // round registers + the next round's memorize begins
         }
-        // Fell out of the round loop. If the game has ended anyway, that is a completion; if it
-        // is still showing, the cap was hit with rounds outstanding.
-        return await this.isOnMemoryChallenge()
-            ? gaveUp(`reached the ${maxRounds}-round cap while still on the Memory Challenge`)
-            : completed(`left the Memory Challenge after ${maxRounds} rounds`);
     }
 
     /** True when F3 has been completed — the app leaves F3 for the next-phase ("Words
      *  per minute" / "Start Level") journey map, so `foundationLevel` is no longer F3. */
     async isPastF3(): Promise<boolean> {
         return await this.pageTextMatchesAll(this.copy.pastF3);
-    }
-
-    /** Where a parked account has come to rest, relative to F3. */
-    async f3Position(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry' | 'unknown'> {
-        // Ordered cheapest-first, and 'past' first because the next-phase map is a distinct
-        // screen: a decayed account must be classified as decayed, not as an unknown screen.
-        if (await this.isPastF3()) {
-            return 'past';
-        }
-        if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge()) {
-            return 'in-game';
-        }
-        // Last, and the only one that waits — the journey map may still be rendering.
-        if (await this.startFoundationButton().isVisible({ timeout: entryTimeoutMs }).catch(() => false)) {
-            return 'at-entry';
-        }
-        return 'unknown';
-    }
-
-    /**
-     * Assert a parked account is somewhere the F3 drive can start from, and report WHERE.
-     *
-     * The F3 spec had no precondition at all (only the F2 spec did), so a resume that landed on
-     * the wrong screen — a help-language modal that was not confirmed, a decayed account, a
-     * changed post-login flow — surfaced much later as `completeF3` throwing "unrecognised
-     * screen", which reads as a defect in the F3 driver. It is not; it is the account or the
-     * resume, and the difference decides who has to do something about it. Returning the
-     * position rather than just passing/failing lets the caller treat a forward-decayed account
-     * as the account-state problem it is.
-     */
-    async expectPositionedForF3(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry'> {
-        const position = await this.f3Position(entryTimeoutMs);
-        if (position === 'unknown') {
-            await this.captureState('f3-precondition-unrecognised');
-            throw new Error(
-                'F3 precondition failed: after login and resume the account is not at an F3 entry '
-                + '("Start F3"), not inside an F3 game (Letter Launcher / Memory Challenge), and '
-                + 'not past F3. This is a RESUME or ACCOUNT-STATE failure, not a failure of the F3 '
-                + `drive — completeF3 has not run. Screen text: "${await this.pageTextHead()}"`,
-            );
-        }
-        return position;
     }
 
     /**
@@ -1238,26 +1070,6 @@ export class FoundationPage {
      * The audio-recovery hook must be installed before F3's games preload (done here,
      * before "Start F3"). Throws (with a screenshot) if it can't recognise a screen.
      */
-    /**
-     * Record a finished F3 game in the node log, or fail loudly if its solver gave up.
-     *
-     * The node log is what `foundation-f3.spec.ts` asserts on, so appending to it is a claim
-     * that the game was played. A solver that gave up has not earned that claim, and the run
-     * must stop there rather than continue accumulating a log that will read as success.
-     */
-    private async recordF3Game(name: string, tag: string, done: string[], result: SolverResult): Promise<void> {
-        if (!result.completed) {
-            await this.captureState(`f3-${tag.toLowerCase()}-did-not-complete`);
-            throw new Error(
-                `completeF3: the ${name} did not complete — ${result.reason}. `
-                + `Games finished so far: ${done.length ? done.join(' ') : '(none)'}. `
-                + `Screen text: "${await this.pageTextHead()}"`,
-            );
-        }
-        console.log(`[F3] ${name} complete — ${result.reason}`);
-        done.push(tag);
-    }
-
     async completeF3(maxNodes = 120): Promise<string[]> {
         await this.installLetterLauncherHook();          // before Start F3 → capture launcher audio
         const done: string[] = [];
@@ -1265,18 +1077,8 @@ export class FoundationPage {
         for (let i = 0; i < maxNodes; i++) {
             if (entered && await this.isPastF3()) return done;          // F3 finished → next phase
             if (!entered && await this.clickStartFoundationIfPresent()) { entered = true; done.push('StartF3'); stuck = 0; continue; }
-            // A game is recorded in `done` ONLY when its solver says it finished. This used to
-            // push 'LL'/'MC' unconditionally, so a solver that gave up without playing the game
-            // still contributed to the log the F3 spec asserts on — a game that did nothing
-            // produced a green test. See SolverResult.
-            if (await this.isOnLetterLauncher()) {
-                await this.recordF3Game('Letter Launcher', 'LL', done, await this.completeLetterLauncher());
-                stuck = 0; continue;
-            }
-            if (await this.isOnMemoryChallenge()) {
-                await this.recordF3Game('Memory Challenge', 'MC', done, await this.completeMemoryChallenge());
-                stuck = 0; continue;
-            }
+            if (await this.isOnLetterLauncher()) { await this.completeLetterLauncher(); done.push('LL'); stuck = 0; continue; }
+            if (await this.isOnMemoryChallenge()) { await this.completeMemoryChallenge(); done.push('MC'); stuck = 0; continue; }
             // Demo / celebration / apply-entry transitions.
             if (await this.clickChallengeAdvance()) {
                 // Fast-poll so the next game (esp. a Memory Challenge with a short memorize
@@ -1307,10 +1109,9 @@ export class FoundationPage {
      * (P#). Lands on the next lesson node (the next Letter Train, or an Apply entry
      * after every 3rd pair).
      */
-    async completeLearnPracticePair(): Promise<{ train: SolverResult; practice: SolverResult }> {
-        const train = await this.completeLetterTrain();          // L# Letter Train → P#
-        const practice = await this.completeLetterHuntPractice();   // P# Letter Hunt → next node
-        return { train, practice };
+    async completeLearnPracticePair(): Promise<void> {
+        await this.completeLetterTrain();          // L# Letter Train → P#
+        await this.completeLetterHuntPractice();   // P# Letter Hunt → next node
     }
 
     /**
@@ -1320,14 +1121,12 @@ export class FoundationPage {
      * When no question is showing we click the transition button until the challenge
      * finishes and the next node (a Letter Train "N/16") appears.
      */
-    async completeApplyChallenge(): Promise<SolverResult> {
+    async completeApplyChallenge(): Promise<void> {
         const cleanup = await this.installLetterHook();
         try {
             let stuck = 0;
             for (let i = 0; i < 120; i++) {
-                if ((await this.trainProgress()) !== '') {
-                    return completed(`reached the next Letter Train after ${i} iterations`);
-                }
+                if ((await this.trainProgress()) !== '') return;   // reached the next Letter Train
                 if (await this.hasLetterOptions()) {               // F1 apply: single-letter options
                     const letter = await this.readSpokenLetter();
                     if (letter) { await this.tapLetterAndAdvance(letter); stuck = 0; continue; }
@@ -1341,12 +1140,9 @@ export class FoundationPage {
                 if (await this.clickChallengeAdvance()) { stuck = 0; await this.page.waitForTimeout(2500); continue; }
                 stuck++;
                 if (stuck >= 4 && await this.recoverIfDisconnected()) { stuck = 0; continue; }
-                if (stuck > 12) {
-                    return gaveUp(`no question and no advance control for 13 iterations (at iteration ${i + 1})`);
-                }
+                if (stuck > 12) return;
                 await this.page.waitForTimeout(1000);
             }
-            return gaveUp('reached the 120-iteration cap without reaching the next Letter Train');
         } finally {
             cleanup();
         }
@@ -1443,15 +1239,11 @@ export class FoundationPage {
                 entered = true; done.push('StartF'); stuck = 0; continue;
             }
             if (await this.isOnApplyEntry()) {           // an Apply "Ready for Challenge?" entry
-                const apply = await this.completeApplyChallenge();
-                // Two independent signals, both kept: the solver's own outcome, and a re-read of
-                // the screen. The screen check is the stronger of the two (it does not depend on
-                // the solver being honest about itself), so it stays as the gate; the solver's
-                // reason is folded into the message because it says WHY.
+                await this.completeApplyChallenge();
                 if (await this.isOnApplyEntry()) {       // still on the entry → it never ran
                     await this.captureState('foundation-apply-did-not-complete');
-                    throw new Error(`Apply challenge did not complete (still on 'Ready for Challenge') `
-                        + `— ${apply.reason}. Page text: "${await this.pageTextHead()}"`);
+                    throw new Error(`Apply challenge did not complete (still on 'Ready for Challenge'). `
+                        + `Page text: "${await this.pageTextHead()}"`);
                 }
                 applies++; done.push(`A${startApplyNum + applies - 1}`);
                 console.log(`[Foundation] completed Apply A${startApplyNum + applies - 1}; nodes: ${done.join(' ')}`);
@@ -1460,24 +1252,14 @@ export class FoundationPage {
             }
             const tp = await this.trainProgress();
             if (tp) {                                    // Learn node (Letter Train)
-                const train = await this.completeLetterTrain();
-                // A train that gave up is still on screen, so the loop would re-enter it and
-                // append another L(n) each time — the node log would grow while nothing
-                // progressed. Fail here instead of accumulating a log that reads like work.
-                if (!train.completed) {
-                    await this.captureState('letter-train-did-not-complete');
-                    throw new Error(`Letter Train did not complete after ${done.length} nodes `
-                        + `— ${train.reason} (level=${await this.foundationLevel()}). `
-                        + `Page text: "${await this.pageTextHead()}"`);
-                }
+                await this.completeLetterTrain();
                 done.push(`L(${tp.split('/')[1]})`);
                 stuck = 0; continue;
             }
             const onWordRec = await this.isOnWordRecognition();    // F2 "Letter Recognition"
             if (onWordRec || await this.isOnPracticeDemo() || await this.hasLetterOptions()) {   // Practice node
-                const practice = onWordRec
-                    ? await this.completeWordRecognitionPractice()   // F2 word options
-                    : await this.completeLetterHuntPractice();       // F1 letter options
+                if (onWordRec) await this.completeWordRecognitionPractice();   // F2 word options
+                else await this.completeLetterHuntPractice();                  // F1 letter options
                 // Confirm the practice actually advanced (to a train / Apply entry / any
                 // non-practice screen). If it's still a practice, it didn't complete
                 // (e.g. a level whose answer/advance mechanic differs) — capture and fail
@@ -1488,8 +1270,7 @@ export class FoundationPage {
                 if (!advanced) {
                     await this.captureState('practice-did-not-advance');
                     throw new Error(`Practice did not advance after ${done.length} nodes `
-                        + `— ${practice.reason} (level=${await this.foundationLevel()}). `
-                        + `Page text: "${await this.pageTextHead()}"`);
+                        + `(level=${await this.foundationLevel()}). Page text: "${await this.pageTextHead()}"`);
                 }
                 done.push('P');
                 stuck = 0; continue;

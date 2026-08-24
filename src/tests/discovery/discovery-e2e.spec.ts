@@ -7,7 +7,7 @@ import { FoundationPage } from '../../pages/foundation';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
 import { ANY_LANGUAGE_LABEL_TOKEN, labelRe } from '../../utils/languages';
-import { copy, copyRe } from '../../utils/UiCopy';
+import { copy, copyRe } from '../../utils/uiCopy';
 
 /**
  * Full end-to-end Discovery + F-series flow — TC-001 → TC-013 — executed in a SINGLE

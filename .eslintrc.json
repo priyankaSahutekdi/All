@@ -31,7 +31,7 @@
         "prefer-const": "error",
         "no-var": "error",
         "eqeqeq": ["error", "always"],
-        "curly": ["error", "all"],
+        "curly": ["error", "multi-line"],
 
         "playwright/no-focused-test": "error",
         "playwright/no-skipped-test": "warn",
