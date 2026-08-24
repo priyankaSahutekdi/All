@@ -1,17 +1,22 @@
 import { defineConfig, devices } from '@playwright/test';
 import * as dotenv from 'dotenv';
 import { resolveEnvironment } from './config/environments';
+import { resolveLanguage } from './config/language';
 
 dotenv.config();
 
 // Resolve the target instance (UAT / LAB / LAB2 / …) from ENV/TEST_ENV/BASE_URL. This is the
 // single source of truth for the base URL — tests use page.goto('/') and never hardcode it.
 const APP_ENV = resolveEnvironment();
-// Expose the resolved name + run mode to the custom reporter (it reads these envs).
+// Resolve the target language from TEST_LANG (default english). Throws on an unknown code
+// rather than falling back, so a typo cannot produce a green run in the wrong language.
+const APP_LANG = resolveLanguage();
+// Expose the resolved name + language + run mode to the custom reporter (it reads these envs).
 process.env.TEST_ENV = APP_ENV.name;
+process.env.TEST_LANG = APP_LANG.code;
 process.env.TEST_MODE = process.env.TEST_MODE || (process.argv.includes('--headed') ? 'headed' : 'headless');
 // eslint-disable-next-line no-console
-console.log(`\n🌐 Target environment: ${APP_ENV.name}  (${APP_ENV.baseURL})  |  mode: ${process.env.TEST_MODE}\n`);
+console.log(`\n🌐 Target environment: ${APP_ENV.name}  (${APP_ENV.baseURL})  |  language: ${APP_LANG.code}  |  mode: ${process.env.TEST_MODE}\n`);
 
 export default defineConfig({
     testDir: './src/tests',
