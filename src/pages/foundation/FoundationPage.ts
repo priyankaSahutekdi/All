@@ -638,9 +638,9 @@ export class FoundationPage {
                 if (m) w.__lhLetter = decode(m[1]);
             };
             const origPlay = HTMLMediaElement.prototype.play;
-            HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+            HTMLMediaElement.prototype.play = function (this: HTMLMediaElement, ...args: unknown[]) {
                 capture(this.currentSrc || this.src);
-                return origPlay.apply(this, arguments as unknown as []);
+                return origPlay.apply(this, args as []);
             };
         }, LETTER_AUDIO_RE_SOURCE);
         this.lhNetLetter = null;
@@ -887,14 +887,14 @@ export class FoundationPage {
                 return u;
             };
             const origPlay = HTMLMediaElement.prototype.play;
-            HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+            HTMLMediaElement.prototype.play = function (this: HTMLMediaElement, ...args: unknown[]) {
                 const src = this.currentSrc || this.src;
                 const d = (src || '').match(audioRe);
                 let letter: string | null = null;
                 if (d) letter = decode(d[1]);
                 else if (src && blobToLetter.has(src)) letter = blobToLetter.get(src)!;
                 if (letter) { w.__spokenLetter = letter; (w.__spokenSeq as string[]).push(letter); }
-                return origPlay.apply(this, arguments as unknown as []);
+                return origPlay.apply(this, args as []);
             };
         }, LETTER_AUDIO_RE_SOURCE);
     }
@@ -1058,6 +1058,48 @@ export class FoundationPage {
      *  per minute" / "Start Level") journey map, so `foundationLevel` is no longer F3. */
     async isPastF3(): Promise<boolean> {
         return await this.pageTextMatchesAll(this.copy.pastF3);
+    }
+
+    /** Where a parked account has come to rest, relative to F3. */
+    async f3Position(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry' | 'unknown'> {
+        // Ordered cheapest-first, and 'past' first because the next-phase map is a distinct
+        // screen: a decayed account must be classified as decayed, not as an unknown screen.
+        if (await this.isPastF3()) {
+            return 'past';
+        }
+        if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge()) {
+            return 'in-game';
+        }
+        // Last, and the only one that waits — the journey map may still be rendering.
+        if (await this.startFoundationButton().isVisible({ timeout: entryTimeoutMs }).catch(() => false)) {
+            return 'at-entry';
+        }
+        return 'unknown';
+    }
+
+    /**
+     * Assert a parked account is somewhere the F3 drive can start from, and report WHERE.
+     *
+     * The F3 spec had no precondition at all (only the F2 spec did), so a resume that landed on
+     * the wrong screen — a help-language modal that was not confirmed, a decayed account, a
+     * changed post-login flow — surfaced much later as `completeF3` throwing "unrecognised
+     * screen", which reads as a defect in the F3 driver. It is not; it is the account or the
+     * resume, and the difference decides who has to do something about it. Returning the
+     * position rather than just passing/failing lets the caller treat a forward-decayed account
+     * as the account-state problem it is.
+     */
+    async expectPositionedForF3(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry'> {
+        const position = await this.f3Position(entryTimeoutMs);
+        if (position === 'unknown') {
+            await this.captureState('f3-precondition-unrecognised');
+            throw new Error(
+                'F3 precondition failed: after login and resume the account is not at an F3 entry '
+                + '("Start F3"), not inside an F3 game (Letter Launcher / Memory Challenge), and '
+                + 'not past F3. This is a RESUME or ACCOUNT-STATE failure, not a failure of the F3 '
+                + `drive — completeF3 has not run. Screen text: "${await this.pageTextHead()}"`,
+            );
+        }
+        return position;
     }
 
     /**

@@ -26,6 +26,10 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
 
         const foundation = new FoundationPage(page, lang);
 
+        // Where the account came to rest after the resume. Classified once, up front, so the
+        // steps below can tell an account-state problem from a code problem.
+        let position: 'past' | 'in-game' | 'at-entry';
+
         await test.step('Login as the F3 account and resume F3 in English', async () => {
             await resumeParkedAccount(page, foundation, {
                 ...accounts.f3,
@@ -34,13 +38,19 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
                 // Must be installed before F3's games preload their audio.
                 beforeSkipCheck: () => foundation.installLetterLauncherHook(),
             });
+            // PRECONDITION (the F2 spec has had one all along; this one did not). Without it a
+            // resume that landed on the wrong screen surfaced later as completeF3 throwing
+            // "unrecognised screen", which reads as a bug in the F3 driver rather than in the
+            // resume or the account. Attribution is the whole point.
+            position = await foundation.expectPositionedForF3();
+            console.log(`[TC-022] F3 account position after resume: ${position}`);
         });
 
         await test.step('TC-021 / TC-022 (F3): drive all games through A3', async () => {
             // If the account has already been carried past F3 (it advances permanently once
             // completed), there is nothing left to drive — skip rather than fail. A fresh
             // F3-positioned account (or the dynamic-user E2E) exercises the full drive.
-            if (await foundation.isPastF3()) {
+            if (position === 'past') {
                 test.skip(true, 'F3 account has already graduated past F3 (F3 verified via the completeF3 drive; the dynamic-user E2E re-validates it end-to-end).');
                 return;
             }
