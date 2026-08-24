@@ -47,11 +47,32 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
         });
 
         await test.step('TC-021 / TC-022 (F3): drive all games through A3', async () => {
-            // If the account has already been carried past F3 (it advances permanently once
-            // completed), there is nothing left to drive — skip rather than fail. A fresh
-            // F3-positioned account (or the dynamic-user E2E) exercises the full drive.
+            // The account has been carried past F3. Foundation levels advance PERMANENTLY, so
+            // there is nothing left to drive — and there never will be on this account.
+            //
+            // This used to be an unconditional test.skip(), which is the finding: a skip that
+            // can never stop happening reports as "not run" forever while the surrounding docs
+            // go on showing this test as covered (PROJECT_CONTEXT.md still lists TC-021 as ✅).
+            // Nobody has to look at it, so nobody does, and F3 quietly stops being tested.
+            //
+            // It is now a FAILURE, correctly attributed to account state rather than to code.
+            // ALLOW_STALE_F3=1 is a deliberate acknowledgement for a run where that is
+            // understood and accepted — it still skips, but the skip is a stated choice with a
+            // name, which is exactly what the silent version lacked.
             if (position === 'past') {
-                test.skip(true, 'F3 account has already graduated past F3 (F3 verified via the completeF3 drive; the dynamic-user E2E re-validates it end-to-end).');
+                const detail = `The parked F3 account (${accounts.f3.username}) has already `
+                    + 'graduated past F3, and Foundation levels do not go backwards, so this spec '
+                    + 'cannot exercise F3 on it again — not on this run and not on any future run. '
+                    + 'This is ACCOUNT STATE, not a code failure: nothing here is broken, but F3 is '
+                    + 'NOT being tested. Fix by re-parking a fresh F3-positioned account as '
+                    + 'accounts.f3, or by covering F3 through the dynamic-user E2E '
+                    + '(FULL_E2E=1 in discovery-e2e.spec.ts), which walks a new user F1→F2→F3.';
+                if (process.env.ALLOW_STALE_F3 !== '1') {
+                    throw new Error(`F3 coverage has lapsed. ${detail} `
+                        + 'Set ALLOW_STALE_F3=1 to acknowledge this and skip instead of failing.');
+                }
+                console.warn(`[TC-022] ⚠️  F3 NOT TESTED — skipped by ALLOW_STALE_F3=1. ${detail}`);
+                test.skip(true, `F3 not tested: account is past F3, acknowledged via ALLOW_STALE_F3=1. ${detail}`);
                 return;
             }
             const games = await foundation.completeF3();
