@@ -1,7 +1,8 @@
 import { Page } from '@playwright/test';
 import { DiscoveryLoginPage } from '../pages/discovery/DiscoveryLoginPage';
 import { FoundationPage } from '../pages/foundation/FoundationPage';
-import { AppLanguage } from './languages';
+import { AppLanguage, languageByCode } from './languages';
+import { copyRe } from './uiCopy';
 
 /**
  * Resume a persistent, parked test account (`Testf2auto`, `Testf3auto`, `m4auto`, …) on its
@@ -47,6 +48,9 @@ export async function resumeParkedAccount(
     foundation: FoundationPage,
     opts: ResumeOptions,
 ): Promise<void> {
+    // Resolved once up front: both the Skip label and the language switch need it.
+    const target = typeof opts.lang === 'string' ? languageByCode(opts.lang) : (opts.lang ?? languageByCode('english'));
+
     const login = new DiscoveryLoginPage(page);
     await login.navigate();
     await login.login(opts.username, opts.password);
@@ -58,16 +62,25 @@ export async function resumeParkedAccount(
         await opts.beforeSkipCheck();
     }
     if (opts.micSkip) {
-        const skip = page.getByRole('button', { name: /^Skip$/i }).first();
+        // The label comes from the uiCopy registry, not a literal: a hardcoded /^Skip$/i simply
+        // never matches on a non-English build, so the button is silently not clicked and the
+        // resume lands on the mic-calibration screen instead of the saved journey.
+        const skip = page.getByRole('button', { name: copyRe('skip', target, { exact: true }) }).first();
         if (await skip.isVisible({ timeout: opts.micSkip.timeoutMs }).catch(() => false)) {
             await skip.click({ force: true });
             await page.waitForTimeout(opts.micSkip.postWaitMs);
         }
     }
 
-    const switchLanguage = (): Promise<void> => foundation.switchToLanguage(opts.lang ?? 'english');
+    const switchLanguage = (): Promise<void> => foundation.switchToLanguage(target);
     if (opts.ignoreLanguageSwitchErrors) {
-        await switchLanguage().catch(() => {});
+        // Swallowed on purpose for one call site, but NOT silently: switchToLanguage now
+        // verifies its outcome and throws, so reaching here means the run really is in the
+        // wrong language. That must be visible in the log even where it is tolerated.
+        await switchLanguage().catch((e: Error) => {
+            // eslint-disable-next-line no-console
+            console.warn(`[sessionResume] language switch failed and was ignored by request: ${e.message}`);
+        });
     } else {
         await switchLanguage();
     }

@@ -23,11 +23,26 @@
  *
  * Behaviour for English input is unchanged from the previous `[^a-z0-9\s]` rule: ASCII
  * punctuation, quotes and dashes are all Unicode punctuation or symbols, so they are
- * still collapsed to a space.
+ * still collapsed to a space. The two Unicode-only steps below are likewise no-ops on
+ * ASCII, so this stays byte-identical for English while becoming correct for Indic text.
+ *
+ * NFC first: the same Devanagari word can be encoded more than one way (a precomposed code
+ * point vs. base + combining mark). Both sides of every comparison here are compared with
+ * `===` or used as a Map key, so without a canonical form two visually identical strings
+ * miss each other and the lookup silently returns nothing.
+ *
+ * Then ZWJ/ZWNJ are removed rather than turned into a space. They are invisible joiners that
+ * sit INSIDE a word to force a half-form, and they are `\p{Cf}` — not `\p{L}`, `\p{N}` or
+ * `\p{M}` — so the punctuation rule below would otherwise split one word into two.
+ * Deleting them also makes the joined and unjoined spellings normalize to the same
+ * string, which is what a normalizer keying both sides of a lookup has to do; merely keeping
+ * them would preserve the mismatch.
  */
 export function normalizeText(s: string): string {
     return (s || '')
+        .normalize('NFC')
         .toLowerCase()
+        .replace(/[\u200C\u200D]/g, '')   // ZWNJ + ZWJ (escaped: literals are invisible)
         .replace(/[^\p{L}\p{N}\p{M}\s]/gu, ' ')
         .replace(/\s+/g, ' ')
         .trim();
@@ -102,3 +117,47 @@ export const SHORT_TOKEN = new RegExp(`^(?:[A-Za-z]{1,10}|${nonLatinRun(1, 10)})
  * and no script guard is needed.
  */
 export const LETTER_CLASS = '\\p{L}\\p{M}';
+
+// ============================================
+// Prompt-audio path
+// ============================================
+
+/**
+ * The app's letter/word prompt audio, e.g. `/audio/english/letter/A.wav`, capturing the token.
+ *
+ * One home for this pattern because it is read in four places (two in-page hooks, one network
+ * listener, one blob-recovery hook) and it gates the ENTIRE answer chain for F1/F2/F3: if the
+ * token cannot be recovered, `readSpokenLetter` / `readSpokenViaSpeaker` / `launcherState`
+ * return nothing and the solvers fall into their give-up paths, answering nothing at all.
+ *
+ * `[^/]+` rather than `[A-Za-z]+`: the old class silently failed on any non-Latin filename,
+ * and because failure is silent it would look like a stalled game rather than a bug. `[^/]+`
+ * is a strict superset for Latin paths — it cannot cross a path separator, and the `\.wav`
+ * suffix stops it running away — so English behaviour is unchanged.
+ *
+ * NOTE (unverified): whether a Hindi build actually serves Devanagari filenames, percent-
+ * encoded ones, or transliterated ASCII has NOT been observed on a real build. This widening
+ * plus `decodeAudioToken` covers the first two; if the real build transliterates, the token
+ * will need mapping instead. Confirm before trusting a Hindi run (REFACTORING_PLAN.md task 13).
+ */
+export const LETTER_AUDIO_RE = /\/letter\/([^/]+)\.wav/i;
+
+/** `LETTER_AUDIO_RE` as a source string, for rebuilding inside `page.evaluate`. */
+export const LETTER_AUDIO_RE_SOURCE = LETTER_AUDIO_RE.source;
+
+/**
+ * Turn a token captured from an audio path into the form used for comparison.
+ *
+ * Percent-decoded (a non-ASCII filename may arrive either raw or encoded depending on how the
+ * URL was built), NFC-composed (so a decomposed spelling matches a precomposed one under
+ * `===`), then upper-cased. `toUpperCase()` is a no-op for Devanagari but is what the existing
+ * Latin comparisons use, so it is kept for both rather than branching on script.
+ *
+ * Decoding is guarded: `decodeURIComponent` throws on a malformed sequence (a stray `%`), and
+ * a throw inside an audio hook would break playback recovery entirely.
+ */
+export function decodeAudioToken(raw: string): string {
+    let s = raw || '';
+    try { s = decodeURIComponent(s); } catch { /* keep the raw form */ }
+    return s.normalize('NFC').toUpperCase();
+}

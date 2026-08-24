@@ -2,7 +2,10 @@ import { expect, Page } from '@playwright/test';
 import { AssessmentPage } from '../discovery';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { currentAppFrame } from '../../utils/appFrame';
-import { ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS } from '../../utils/text';
+import {
+    ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS,
+    LETTER_AUDIO_RE, LETTER_AUDIO_RE_SOURCE, decodeAudioToken,
+} from '../../utils/text';
 import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../utils/languages';
 import { FOUNDATION_TRANSITION_PRIORITY } from '../../utils/transitions';
 
@@ -91,6 +94,13 @@ export class FoundationPage {
      * Every step is guarded, so this is safe to call when the app is already in `lang` (the
      * common case) — it returns early. `lang` may be a code ('english', 'hindi') or an
      * AppLanguage from the registry.
+     *
+     * THROWS if the app is not in `lang` when it finishes. The individual clicks stay tolerant
+     * (the help modal genuinely may not be showing), but the *outcome* is verified, because a
+     * silent failure here is the worst failure in the suite: the run continues in whatever
+     * language the app happened to be in and reports green, having validated a language nobody
+     * asked for. Verifying the end state rather than each click is also what makes the tolerant
+     * clicks safe to keep.
      */
     async switchToLanguage(lang: string | AppLanguage = 'english'): Promise<void> {
         const target = typeof lang === 'string' ? languageByCode(lang) : lang;
@@ -105,14 +115,7 @@ export class FoundationPage {
             }
         }
         // 2. If the header switcher already shows the target language, nothing more to do.
-        if (await this.page.evaluate(({ s, f }) => {
-            const want = new RegExp(s, f);
-            for (const el of Array.from(document.querySelectorAll('div'))) {
-                const r = el.getBoundingClientRect();
-                if (r.y < 60 && r.x > 850 && getComputedStyle(el).cursor === 'pointer' && want.test((el.textContent || '').trim())) return true;
-            }
-            return false;
-        }, { s: targetRe.source, f: targetRe.flags })) return;
+        if (await this.headerShowsLanguage(targetRe)) return;
         // 3. Open the top-right language switcher — a clickable header box showing whichever
         //    language is currently active, so it is matched against every known label.
         await this.page.evaluate((langSrc) => {
@@ -136,6 +139,47 @@ export class FoundationPage {
             await langConfirm.click({ force: true }).catch(() => {});
             await this.page.waitForTimeout(4500);
         }
+        // 5. Verify. Polled rather than checked once: step 4 already waited, but the header
+        //    re-renders after the language change and a single instant read can race it.
+        for (let i = 0; i < 10; i++) {
+            if (await this.headerShowsLanguage(targetRe)) return;
+            await this.page.waitForTimeout(600);
+        }
+        await this.captureState(`language-switch-failed-${target.code}`);
+        const shown = await this.currentHeaderLanguage();
+        throw new Error(
+            `Failed to switch the app to '${target.code}' (${target.label}). ` +
+            `The header language switcher ${shown ? `still shows '${shown}'` : 'could not be read'}. ` +
+            `Continuing would run the whole spec in the wrong language and report it as a pass. ` +
+            `Screen text: ${await this.pageTextHead()}`,
+        );
+    }
+
+    /** Does the top-right header switcher currently show a label matching `labelPattern`? */
+    private async headerShowsLanguage(labelPattern: RegExp): Promise<boolean> {
+        return this.page.evaluate(({ s, f }) => {
+            const want = new RegExp(s, f);
+            for (const el of Array.from(document.querySelectorAll('div'))) {
+                const r = el.getBoundingClientRect();
+                if (r.y < 60 && r.x > 850 && getComputedStyle(el).cursor === 'pointer' && want.test((el.textContent || '').trim())) return true;
+            }
+            return false;
+        }, { s: labelPattern.source, f: labelPattern.flags });
+    }
+
+    /** The language label the header switcher is showing, if any — for error messages. */
+    private async currentHeaderLanguage(): Promise<string> {
+        return this.page.evaluate((langSrc) => {
+            const anyLabel = new RegExp(langSrc, 'u');
+            for (const el of Array.from(document.querySelectorAll('div'))) {
+                const r = el.getBoundingClientRect();
+                if (r.y < 60 && r.x > 850 && getComputedStyle(el).cursor === 'pointer') {
+                    const m = (el.textContent || '').trim().match(anyLabel);
+                    if (m) return m[0];
+                }
+            }
+            return '';
+        }, ANY_LANGUAGE_LABEL.source);
     }
 
     /**
@@ -393,25 +437,35 @@ export class FoundationPage {
     /** Install the in-page play() hook + network listener that capture the spoken
      *  target letter. Returns a cleanup function (removes the network listener). */
     private async installLetterHook(): Promise<() => void> {
-        await this.page.evaluate(() => {
+        // The audio-path pattern is passed in (not inlined) so it has a single home in text.ts
+        // — it gates the whole answer chain and used to exist as four Latin-only copies.
+        await this.page.evaluate((audioReSrc) => {
             const w = window as unknown as { __lhInstalled?: boolean; __lhLetter?: string | null };
             if (w.__lhInstalled) return;
             w.__lhInstalled = true;
             w.__lhLetter = null;
+            const audioRe = new RegExp(audioReSrc, 'i');
+            // Mirrors decodeAudioToken() in text.ts; inlined because an evaluate body is
+            // serialized and cannot close over an imported function.
+            const decode = (raw: string): string => {
+                let s = raw || '';
+                try { s = decodeURIComponent(s); } catch { /* keep the raw form */ }
+                return s.normalize('NFC').toUpperCase();
+            };
             const capture = (src: string | null | undefined) => {
-                const m = (src || '').match(/\/letter\/([A-Za-z]+)\.wav/i);
-                if (m) w.__lhLetter = m[1].toUpperCase();
+                const m = (src || '').match(audioRe);
+                if (m) w.__lhLetter = decode(m[1]);
             };
             const origPlay = HTMLMediaElement.prototype.play;
             HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
                 capture(this.currentSrc || this.src);
                 return origPlay.apply(this, arguments as unknown as []);
             };
-        });
+        }, LETTER_AUDIO_RE_SOURCE);
         this.lhNetLetter = null;
         const onReq = (r: { url: () => string }) => {
-            const m = r.url().match(/\/letter\/([A-Za-z]+)\.wav/i);
-            if (m) this.lhNetLetter = m[1].toUpperCase();
+            const m = r.url().match(LETTER_AUDIO_RE);
+            if (m) this.lhNetLetter = decodeAudioToken(m[1]);
         };
         this.page.on('request', onReq);
         return () => this.page.off('request', onReq);
@@ -618,12 +672,20 @@ export class FoundationPage {
      *  MUST be called BEFORE the F3 game preloads its letter audio (i.e. before clicking
      *  "Start F3"), otherwise the preload fetches are missed and recovery fails. */
     async installLetterLauncherHook(): Promise<void> {
-        await this.page.evaluate(() => {
+        await this.page.evaluate((audioReSrc) => {
             const w = window as unknown as { __llInstalled?: boolean; __spokenLetter?: string | null; __spokenSeq?: string[] };
             if (w.__llInstalled) return;
             w.__llInstalled = true;
             w.__spokenLetter = null;
             w.__spokenSeq = [];   // ordered list of spoken letters (for the Memory Challenge sequence)
+            const audioRe = new RegExp(audioReSrc, 'i');
+            // Mirrors decodeAudioToken() in text.ts — see the note there; an evaluate body is
+            // serialized so it cannot close over the imported helper.
+            const decode = (raw: string): string => {
+                let s = raw || '';
+                try { s = decodeURIComponent(s); } catch { /* keep the raw form */ }
+                return s.normalize('NFC').toUpperCase();
+            };
             const lenToLetter: Record<number, string> = {};
             const blobToLetter = new Map<string, string>();
             const origFetch = window.fetch.bind(window);
@@ -631,8 +693,8 @@ export class FoundationPage {
                 const res = await origFetch(...(args as Parameters<typeof fetch>));
                 try {
                     const a0 = args[0] as string | Request; const url = typeof a0 === 'string' ? a0 : a0.url;
-                    const m = (url || '').match(/\/letter\/([A-Za-z]+)\.wav/i);
-                    if (m) res.clone().arrayBuffer().then((b) => { lenToLetter[b.byteLength] = m[1].toUpperCase(); }).catch(() => {});
+                    const m = (url || '').match(audioRe);
+                    if (m) res.clone().arrayBuffer().then((b) => { lenToLetter[b.byteLength] = decode(m[1]); }).catch(() => {});
                 } catch { /* ignore */ }
                 return res;
             };
@@ -645,14 +707,14 @@ export class FoundationPage {
             const origPlay = HTMLMediaElement.prototype.play;
             HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
                 const src = this.currentSrc || this.src;
-                const d = (src || '').match(/\/letter\/([A-Za-z]+)\.wav/i);
+                const d = (src || '').match(audioRe);
                 let letter: string | null = null;
-                if (d) letter = d[1].toUpperCase();
+                if (d) letter = decode(d[1]);
                 else if (src && blobToLetter.has(src)) letter = blobToLetter.get(src)!;
                 if (letter) { w.__spokenLetter = letter; (w.__spokenSeq as string[]).push(letter); }
                 return origPlay.apply(this, arguments as unknown as []);
             };
-        });
+        }, LETTER_AUDIO_RE_SOURCE);
     }
 
     /** Current Letter-Launcher state: displayed token (a single letter OR a whole word,

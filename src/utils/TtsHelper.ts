@@ -23,13 +23,31 @@ import * as path from 'path';
  *
  * So Hindi read-aloud needs (a) a hi-IN voice installed on whatever machine runs the suite,
  * and (b) voice selection by language here. Both belong to the Hindi support work once the
- * real Hindi build has been probed — REFACTORING_PLAN.md tasks 13-14. Until then this
- * function returning near-empty audio for Devanagari is expected, and a Hindi read-aloud
- * assertion would fail on silence rather than on a missing word.
+ * real Hindi build has been probed — REFACTORING_PLAN.md tasks 13-14.
+ *
+ * Until then, that silence is detected and THROWN rather than returned: a 46-byte WAV is
+ * still non-empty base64, so every `if (b64)` guard at the call sites passed and the app went
+ * on to record silence with nothing to trace. Failing here names the cause instead. See
+ * MIN_REAL_WAV_BYTES for the measured numbers behind the threshold.
  */
 export class TtsHelper {
     // Cache per word so we synthesize each word only once per run.
     private static cache = new Map<string, string>();
+
+    /**
+     * Smallest WAV we will accept as real speech, in bytes.
+     *
+     * Measured on this runner (Microsoft David/Zira Desktop, en-US), not guessed:
+     *   • Devanagari with an en-US voice → 46 bytes (a 44-byte header + 2) = silence
+     *   • the shortest real utterances ("a", "e", "i", "o") → 33,646 bytes
+     *   • a typical word ("cat") → 39,086 bytes
+     * A 730x gap, so any threshold in between is unambiguous. 1000 sits ~20x above the
+     * header and ~33x below the smallest real word.
+     */
+    private static readonly MIN_REAL_WAV_BYTES = 1000;
+
+    /** Hard cap on the SAPI subprocess so a hung voice cannot consume the whole test timeout. */
+    private static readonly SYNTH_TIMEOUT_MS = 20000;
 
     /** Synthesize `text` to a WAV via Windows SAPI; returns the WAV bytes as base64. */
     static generateWavBase64(text: string): string {
@@ -40,9 +58,9 @@ export class TtsHelper {
         // error to trace. `\p{M}` is required alongside `\p{L}`: matras are marks, so
         // without it "किताब" would be mangled to "कतब".
         const safe = (text || '').replace(/[^\p{L}\p{M}\p{N} ]/gu, '').trim();
-        if (!safe) return '';
+        if (!safe) {return '';}
         const cached = TtsHelper.cache.get(safe.toLowerCase());
-        if (cached) return cached;
+        if (cached) {return cached;}
 
         // Temp filename must stay ASCII — it is interpolated into a PowerShell command line,
         // so a non-ASCII path would add a code-page variable to an already fiddly hop. The
@@ -63,9 +81,43 @@ export class TtsHelper {
             '$s.Dispose();',
         ].join(' ');
 
-        execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], { stdio: 'ignore' });
-        const b64 = fs.readFileSync(outFile).toString('base64');
+        // stderr is captured, not discarded: SAPI can fail non-terminally, exit 0 and write no
+        // file, in which case the readFileSync below throws a bare ENOENT and the actual
+        // diagnosis is whatever PowerShell printed. `stdio: 'ignore'` used to throw it away.
+        try {
+            execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+                stdio: ['ignore', 'ignore', 'pipe'],
+                timeout: TtsHelper.SYNTH_TIMEOUT_MS,
+            });
+        } catch (e) {
+            const err = e as { stderr?: Buffer; signal?: string; message?: string };
+            const stderr = (err.stderr?.toString() || '').trim();
+            throw new Error(
+                `TTS synthesis failed for "${safe}"` +
+                (err.signal === 'SIGTERM' ? ` (timed out after ${TtsHelper.SYNTH_TIMEOUT_MS}ms)` : '') +
+                (stderr ? `\nPowerShell stderr: ${stderr}` : `\n${err.message || ''}`),
+            );
+        }
+
+        const buf = fs.readFileSync(outFile);
         try { fs.unlinkSync(outFile); } catch { /* ignore */ }
+
+        // A WAV that is header-only is silence, and silence is NOT a usable prompt: the app
+        // would record nothing and the assessment would fail somewhere far away, or worse pass
+        // for an unrelated reason. The known cause is a voice that cannot speak the script at
+        // all (no hi-IN voice installed for Devanagari), which is an environment problem and
+        // must be reported as one rather than surfacing later as an opaque decode error.
+        if (buf.length < TtsHelper.MIN_REAL_WAV_BYTES) {
+            throw new Error(
+                `TTS produced ${buf.length} bytes for "${safe}" — that is silence, not speech ` +
+                `(a WAV header alone is 44 bytes; real speech on this runner is >33KB).\n` +
+                `Most likely no installed SAPI voice can speak this script. Install a voice for ` +
+                `the target language and select it by language in TtsHelper ` +
+                `(REFACTORING_PLAN.md tasks 13-14). Text was: ${JSON.stringify(safe)}`,
+            );
+        }
+
+        const b64 = buf.toString('base64');
         TtsHelper.cache.set(safe.toLowerCase(), b64);
         return b64;
     }
