@@ -146,6 +146,29 @@ export function foundationPatterns(lang: AppLanguage) {
 export type FoundationCopy = ReturnType<typeof foundationPatterns>;
 
 /**
+ * Why a node solver stopped.
+ *
+ * The solvers used to return `void` and give up with a bare `return` when they ran out of
+ * budget — indistinguishable, to the caller, from finishing the node. `completeF3` therefore
+ * pushed 'LL'/'MC' into its completed-games log whether the game had been played or not, and
+ * the F3 spec's assertion is on that log, so a game that did nothing at all still produced a
+ * green test. Making the outcome part of the return type is what removes the possibility.
+ */
+export interface SolverResult {
+    /**
+     * True when the solver reached a real end state for the node — it finished the node, or
+     * found the node already gone. False means it exhausted its budget while the node was
+     * still active, i.e. it made no further progress and the node is NOT done.
+     */
+    completed: boolean;
+    /** Short reason, for the node log when completed and for the error message when not. */
+    reason: string;
+}
+
+const completed = (reason: string): SolverResult => ({ completed: true, reason });
+const gaveUp = (reason: string): SolverResult => ({ completed: false, reason });
+
+/**
  * Page Object for the Foundation (F) series entry.
  *
  * Flow handled here:
@@ -542,7 +565,7 @@ export class FoundationPage {
      *     and inject it into the mic so the app records the ACTUAL word audio.
      * Loops until the "N/16" counter disappears (lesson complete → next node).
      */
-    async completeLetterTrain(): Promise<void> {
+    async completeLetterTrain(): Promise<SolverResult> {
         await this.dismissCoachmarks();
         await this.installMicInjection();
         let stuck = 0;
@@ -553,7 +576,9 @@ export class FoundationPage {
                 // a beat during an item transition) before treating the lesson as done.
                 await this.page.waitForTimeout(700);
                 p = await this.trainProgress();
-                if (!p) return;                          // train finished → next node
+                if (!p) {
+                    return completed(`train finished after ${i} items`);
+                }
             }
             console.log(`[Letter Train] ${p}`);
             const arrow = await this.rightmostArrow();
@@ -582,8 +607,16 @@ export class FoundationPage {
             // Not advancing can mean the app dropped its connection (redeploy) rather than
             // "lesson finished" — recover and keep driving instead of silently giving up.
             if (stuck >= 3 && await this.recoverIfDisconnected()) { stuck = 0; continue; }
-            if (stuck >= 8) return;                       // safety: likely transitioned
+            // Safety valve: the counter has not moved in 8 rounds. Historically this returned
+            // as though the lesson were done ("likely transitioned"), which is a guess. If the
+            // train really did transition the check at the top of the loop sees it gone and
+            // returns `completed`; reaching here means the counter is STILL showing `p`, so the
+            // honest answer is that the solver stopped making progress.
+            if (stuck >= 8) {
+                return gaveUp(`the train counter stayed at ${p} for 8 rounds`);
+            }
         }
+        return gaveUp(`reached the 45-item cap while the train counter was still showing`);
     }
 
     /** The URL of the app's content iframe (post-2026-08 deployment: the journey runs
@@ -709,7 +742,7 @@ export class FoundationPage {
      * shown, then answer each of the ~10 questions (read the spoken letter → tap it →
      * advance) until the next lesson node (a Letter Train "N/16") appears.
      */
-    async completeLetterHuntPractice(): Promise<void> {
+    async completeLetterHuntPractice(): Promise<SolverResult> {
         const cleanup = await this.installLetterHook();
         const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
@@ -719,13 +752,25 @@ export class FoundationPage {
         try {
             let stuck = 0;
             for (let q = 0; q < 60; q++) {
-                if ((await this.trainProgress()) !== '') return;   // advanced to next node
-                if (await this.pageTextMatchesAll(this.copy.completion)) return;
+                if ((await this.trainProgress()) !== '') {
+                    return completed(`advanced to the next Letter Train after ${q} questions`);
+                }
+                if (await this.pageTextMatchesAll(this.copy.completion)) {
+                    return completed(`reached a completion screen after ${q} questions`);
+                }
                 const letter = await this.readSpokenLetter();
-                if (!letter) { if (++stuck > 8) return; continue; }
+                // No recoverable spoken letter means no answer can be given — the questions are
+                // not being answered, so this is a give-up, not a completion.
+                if (!letter) {
+                    if (++stuck > 8) {
+                        return gaveUp(`could not recover the spoken letter 9 times in a row (at question ${q + 1})`);
+                    }
+                    continue;
+                }
                 stuck = 0;
                 await this.tapLetterAndAdvance(letter);
             }
+            return gaveUp('reached the 60-question cap without leaving the practice');
         } finally {
             cleanup();
         }
@@ -813,7 +858,7 @@ export class FoundationPage {
      * demo is shown, then answer each of the ~10 questions (hear the word → tap the
      * matching word option → advance) until the next node (a Letter Train or Apply entry).
      */
-    async completeWordRecognitionPractice(): Promise<void> {
+    async completeWordRecognitionPractice(): Promise<SolverResult> {
         const cleanup = await this.installLetterHook();
         const startGame = this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
         if (await startGame.isVisible({ timeout: 8000 }).catch(() => false)) {
@@ -823,14 +868,26 @@ export class FoundationPage {
         try {
             let stuck = 0;
             for (let q = 0; q < 60; q++) {
-                if ((await this.trainProgress()) !== '') return;      // advanced to next Letter Train
-                if (await this.isOnApplyEntry()) return;              // reached an Apply entry
-                if (await this.pageTextMatchesAll(this.copy.completion)) return;
+                if ((await this.trainProgress()) !== '') {
+                    return completed(`advanced to the next Letter Train after ${q} questions`);
+                }
+                if (await this.isOnApplyEntry()) {
+                    return completed(`reached an Apply entry after ${q} questions`);
+                }
+                if (await this.pageTextMatchesAll(this.copy.completion)) {
+                    return completed(`reached a completion screen after ${q} questions`);
+                }
                 const token = await this.readSpokenViaSpeaker();
-                if (!token) { if (++stuck > 8) return; continue; }
+                if (!token) {
+                    if (++stuck > 8) {
+                        return gaveUp(`could not recover the spoken word 9 times in a row (at question ${q + 1})`);
+                    }
+                    continue;
+                }
                 stuck = 0;
                 await this.tapWordAndAdvance(token);
             }
+            return gaveUp('reached the 60-question cap without leaving the practice');
         } finally {
             cleanup();
         }
@@ -953,7 +1010,7 @@ export class FoundationPage {
      * letter, compare to the displayed letter, and press ✓ (match) / ✗ (mismatch) — until
      * the fuel target is reached and the game advances to the next node.
      */
-    async completeLetterLauncher(maxRounds = 80): Promise<void> {
+    async completeLetterLauncher(maxRounds = 80): Promise<SolverResult> {
         await this.installLetterLauncherHook();
         for (const label of this.copy.labels.practiceStart) {
             const b = this.page.getByText(label, { exact: true }).first();
@@ -963,8 +1020,12 @@ export class FoundationPage {
         let miss = 0;
         for (let i = 0; i < maxRounds; i++) {
             const st = await this.launcherState();
-            if (!st.on) return;                                   // advanced past the game
-            if (st.fx >= 0 && st.fy > 0 && st.fx >= st.fy) return; // fuel full → complete
+            if (!st.on) {
+                return completed(`no longer on the Letter Launcher (after ${i} rounds)`);
+            }
+            if (st.fx >= 0 && st.fy > 0 && st.fx >= st.fy) {
+                return completed(`fuel target reached (${st.fx}/${st.fy}) after ${i} rounds`);
+            }
             await this.page.evaluate(() => { (window as unknown as { __spokenLetter: string | null }).__spokenLetter = null; });
             await this.clickLauncherMic();
             let s = await this.launcherState();
@@ -975,11 +1036,19 @@ export class FoundationPage {
             // until the round is advanced), default to ✗ — a wrong guess only forgoes fuel
             // (no penalty) and the NEXT round's audio then plays reliably. Never stall.
             const match = !!(s.shown && s.spoken && s.spoken.toUpperCase() === s.shown.toUpperCase());
-            if (!s.spoken) { if (++miss > 25) { await this.captureState('letter-launcher-stuck'); return; } }
-            else miss = 0;
+            if (!s.spoken) {
+                if (++miss > 25) {
+                    await this.captureState('letter-launcher-stuck');
+                    return gaveUp(`the spoken letter could not be recovered for 26 consecutive rounds `
+                        + `(fuel ${st.fx}/${st.fy}) — the answers are guesses, so the game is not being played`);
+                }
+            } else {
+                miss = 0;
+            }
             await this.pressLauncherChoice(match);
             await this.page.waitForTimeout(1300);
         }
+        return gaveUp(`reached the ${maxRounds}-round cap without filling the fuel target`);
     }
 
     // ── F3 "Memory Challenge" practice ───────────────────────────────────────────────
@@ -1013,7 +1082,7 @@ export class FoundationPage {
      * "Check Sequence" button — repeated for the 5 rounds. The letters are presented
      * visually (no audio in this environment), so no audio hook is needed.
      */
-    async completeMemoryChallenge(maxRounds = 8): Promise<void> {
+    async completeMemoryChallenge(maxRounds = 8): Promise<SolverResult> {
         for (let round = 0; round < maxRounds; round++) {
             // Capture the displayed sequence FIRST (the memorize window can be as short as
             // ~1.6s for word rounds), before any other check, using a tight poll. A demo
@@ -1026,11 +1095,20 @@ export class FoundationPage {
                 await this.page.waitForTimeout(80);
             }
             if (seq.length === 0) {
-                if (!(await this.isOnMemoryChallenge())) return;                    // advanced past MC
+                if (!(await this.isOnMemoryChallenge())) {
+                    return completed(`advanced past the Memory Challenge after ${round} rounds`);
+                }
                 const progress = this.copy.progressCounter.source;
                 const full = await this.page.evaluate((src) => { const m = document.body.innerText.match(new RegExp(src, 'i')); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; }, progress);
-                if (full) return;                                                    // all rounds done
-                await this.captureState('memory-challenge-no-sequence'); return;
+                if (full) {
+                    return completed(`all rounds done (progress counter full) after ${round} rounds`);
+                }
+                // Still on the Memory Challenge, progress not full, and no sequence appeared:
+                // the solver has nothing to answer with. This used to return as though the node
+                // were finished, which is what let completeF3 log 'MC' for a game it never played.
+                await this.captureState('memory-challenge-no-sequence');
+                return gaveUp(`no letter sequence appeared on round ${round + 1} while still on the `
+                    + 'Memory Challenge with rounds outstanding');
             }
             // Wait for the memorize display to end and the answer grid to be active.
             for (let w = 0; w < 30; w++) { const ready = await this.pageTextMatchesAll(this.copy.sequenceGridReady); if (ready) break; await this.page.waitForTimeout(150); }
@@ -1052,6 +1130,11 @@ export class FoundationPage {
             }, this.copy.checkSequence.source);
             await this.page.waitForTimeout(2200);   // round registers + the next round's memorize begins
         }
+        // Fell out of the round loop. If the game has ended anyway, that is a completion; if it
+        // is still showing, the cap was hit with rounds outstanding.
+        return await this.isOnMemoryChallenge()
+            ? gaveUp(`reached the ${maxRounds}-round cap while still on the Memory Challenge`)
+            : completed(`left the Memory Challenge after ${maxRounds} rounds`);
     }
 
     /** True when F3 has been completed — the app leaves F3 for the next-phase ("Words
@@ -1112,6 +1195,26 @@ export class FoundationPage {
      * The audio-recovery hook must be installed before F3's games preload (done here,
      * before "Start F3"). Throws (with a screenshot) if it can't recognise a screen.
      */
+    /**
+     * Record a finished F3 game in the node log, or fail loudly if its solver gave up.
+     *
+     * The node log is what `foundation-f3.spec.ts` asserts on, so appending to it is a claim
+     * that the game was played. A solver that gave up has not earned that claim, and the run
+     * must stop there rather than continue accumulating a log that will read as success.
+     */
+    private async recordF3Game(name: string, tag: string, done: string[], result: SolverResult): Promise<void> {
+        if (!result.completed) {
+            await this.captureState(`f3-${tag.toLowerCase()}-did-not-complete`);
+            throw new Error(
+                `completeF3: the ${name} did not complete — ${result.reason}. `
+                + `Games finished so far: ${done.length ? done.join(' ') : '(none)'}. `
+                + `Screen text: "${await this.pageTextHead()}"`,
+            );
+        }
+        console.log(`[F3] ${name} complete — ${result.reason}`);
+        done.push(tag);
+    }
+
     async completeF3(maxNodes = 120): Promise<string[]> {
         await this.installLetterLauncherHook();          // before Start F3 → capture launcher audio
         const done: string[] = [];
@@ -1119,8 +1222,18 @@ export class FoundationPage {
         for (let i = 0; i < maxNodes; i++) {
             if (entered && await this.isPastF3()) return done;          // F3 finished → next phase
             if (!entered && await this.clickStartFoundationIfPresent()) { entered = true; done.push('StartF3'); stuck = 0; continue; }
-            if (await this.isOnLetterLauncher()) { await this.completeLetterLauncher(); done.push('LL'); stuck = 0; continue; }
-            if (await this.isOnMemoryChallenge()) { await this.completeMemoryChallenge(); done.push('MC'); stuck = 0; continue; }
+            // A game is recorded in `done` ONLY when its solver says it finished. This used to
+            // push 'LL'/'MC' unconditionally, so a solver that gave up without playing the game
+            // still contributed to the log the F3 spec asserts on — a game that did nothing
+            // produced a green test. See SolverResult.
+            if (await this.isOnLetterLauncher()) {
+                await this.recordF3Game('Letter Launcher', 'LL', done, await this.completeLetterLauncher());
+                stuck = 0; continue;
+            }
+            if (await this.isOnMemoryChallenge()) {
+                await this.recordF3Game('Memory Challenge', 'MC', done, await this.completeMemoryChallenge());
+                stuck = 0; continue;
+            }
             // Demo / celebration / apply-entry transitions.
             if (await this.clickChallengeAdvance()) {
                 // Fast-poll so the next game (esp. a Memory Challenge with a short memorize
@@ -1151,9 +1264,10 @@ export class FoundationPage {
      * (P#). Lands on the next lesson node (the next Letter Train, or an Apply entry
      * after every 3rd pair).
      */
-    async completeLearnPracticePair(): Promise<void> {
-        await this.completeLetterTrain();          // L# Letter Train → P#
-        await this.completeLetterHuntPractice();   // P# Letter Hunt → next node
+    async completeLearnPracticePair(): Promise<{ train: SolverResult; practice: SolverResult }> {
+        const train = await this.completeLetterTrain();          // L# Letter Train → P#
+        const practice = await this.completeLetterHuntPractice();   // P# Letter Hunt → next node
+        return { train, practice };
     }
 
     /**
@@ -1163,12 +1277,14 @@ export class FoundationPage {
      * When no question is showing we click the transition button until the challenge
      * finishes and the next node (a Letter Train "N/16") appears.
      */
-    async completeApplyChallenge(): Promise<void> {
+    async completeApplyChallenge(): Promise<SolverResult> {
         const cleanup = await this.installLetterHook();
         try {
             let stuck = 0;
             for (let i = 0; i < 120; i++) {
-                if ((await this.trainProgress()) !== '') return;   // reached the next Letter Train
+                if ((await this.trainProgress()) !== '') {
+                    return completed(`reached the next Letter Train after ${i} iterations`);
+                }
                 if (await this.hasLetterOptions()) {               // F1 apply: single-letter options
                     const letter = await this.readSpokenLetter();
                     if (letter) { await this.tapLetterAndAdvance(letter); stuck = 0; continue; }
@@ -1182,9 +1298,12 @@ export class FoundationPage {
                 if (await this.clickChallengeAdvance()) { stuck = 0; await this.page.waitForTimeout(2500); continue; }
                 stuck++;
                 if (stuck >= 4 && await this.recoverIfDisconnected()) { stuck = 0; continue; }
-                if (stuck > 12) return;
+                if (stuck > 12) {
+                    return gaveUp(`no question and no advance control for 13 iterations (at iteration ${i + 1})`);
+                }
                 await this.page.waitForTimeout(1000);
             }
+            return gaveUp('reached the 120-iteration cap without reaching the next Letter Train');
         } finally {
             cleanup();
         }
@@ -1281,11 +1400,15 @@ export class FoundationPage {
                 entered = true; done.push('StartF'); stuck = 0; continue;
             }
             if (await this.isOnApplyEntry()) {           // an Apply "Ready for Challenge?" entry
-                await this.completeApplyChallenge();
+                const apply = await this.completeApplyChallenge();
+                // Two independent signals, both kept: the solver's own outcome, and a re-read of
+                // the screen. The screen check is the stronger of the two (it does not depend on
+                // the solver being honest about itself), so it stays as the gate; the solver's
+                // reason is folded into the message because it says WHY.
                 if (await this.isOnApplyEntry()) {       // still on the entry → it never ran
                     await this.captureState('foundation-apply-did-not-complete');
-                    throw new Error(`Apply challenge did not complete (still on 'Ready for Challenge'). `
-                        + `Page text: "${await this.pageTextHead()}"`);
+                    throw new Error(`Apply challenge did not complete (still on 'Ready for Challenge') `
+                        + `— ${apply.reason}. Page text: "${await this.pageTextHead()}"`);
                 }
                 applies++; done.push(`A${startApplyNum + applies - 1}`);
                 console.log(`[Foundation] completed Apply A${startApplyNum + applies - 1}; nodes: ${done.join(' ')}`);
@@ -1294,14 +1417,24 @@ export class FoundationPage {
             }
             const tp = await this.trainProgress();
             if (tp) {                                    // Learn node (Letter Train)
-                await this.completeLetterTrain();
+                const train = await this.completeLetterTrain();
+                // A train that gave up is still on screen, so the loop would re-enter it and
+                // append another L(n) each time — the node log would grow while nothing
+                // progressed. Fail here instead of accumulating a log that reads like work.
+                if (!train.completed) {
+                    await this.captureState('letter-train-did-not-complete');
+                    throw new Error(`Letter Train did not complete after ${done.length} nodes `
+                        + `— ${train.reason} (level=${await this.foundationLevel()}). `
+                        + `Page text: "${await this.pageTextHead()}"`);
+                }
                 done.push(`L(${tp.split('/')[1]})`);
                 stuck = 0; continue;
             }
             const onWordRec = await this.isOnWordRecognition();    // F2 "Letter Recognition"
             if (onWordRec || await this.isOnPracticeDemo() || await this.hasLetterOptions()) {   // Practice node
-                if (onWordRec) await this.completeWordRecognitionPractice();   // F2 word options
-                else await this.completeLetterHuntPractice();                  // F1 letter options
+                const practice = onWordRec
+                    ? await this.completeWordRecognitionPractice()   // F2 word options
+                    : await this.completeLetterHuntPractice();       // F1 letter options
                 // Confirm the practice actually advanced (to a train / Apply entry / any
                 // non-practice screen). If it's still a practice, it didn't complete
                 // (e.g. a level whose answer/advance mechanic differs) — capture and fail
@@ -1312,7 +1445,8 @@ export class FoundationPage {
                 if (!advanced) {
                     await this.captureState('practice-did-not-advance');
                     throw new Error(`Practice did not advance after ${done.length} nodes `
-                        + `(level=${await this.foundationLevel()}). Page text: "${await this.pageTextHead()}"`);
+                        + `— ${practice.reason} (level=${await this.foundationLevel()}). `
+                        + `Page text: "${await this.pageTextHead()}"`);
                 }
                 done.push('P');
                 stuck = 0; continue;
