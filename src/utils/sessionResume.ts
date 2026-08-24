@@ -2,7 +2,7 @@ import { Page } from '@playwright/test';
 import { DiscoveryLoginPage } from '../pages/discovery/DiscoveryLoginPage';
 import { FoundationPage } from '../pages/foundation/FoundationPage';
 import { AppLanguage, languageByCode } from './languages';
-import { copyRe } from './uiCopy';
+import { copyRe } from './UiCopy';
 
 /**
  * Resume a persistent, parked test account (`Testf2auto`, `Testf3auto`, `m4auto`, …) on its

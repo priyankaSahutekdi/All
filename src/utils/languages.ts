@@ -16,7 +16,7 @@
  * REFACTORING_PLAN.md R1/R8. This module deliberately holds no defaults and reads no env.
  */
 
-import { LETTER_CLASS } from './text';
+import { LETTER_CLASS } from './Text';
 
 export interface AppLanguage {
     /** BCP-47-ish short code used as the key in code and test data. */

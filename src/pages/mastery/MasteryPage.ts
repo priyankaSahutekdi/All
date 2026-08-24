@@ -1,9 +1,11 @@
-import { Page, expect } from '@playwright/test';
+// `expect` was imported and never used — removed so `npm run lint` can gate CI. No Mastery logic
+// is touched; Mastery stays parked per the 2026-08-18 TC-022 scope decision.
+import { Page } from '@playwright/test';
 import { FoundationPage } from '../foundation/FoundationPage';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { AnswerSource } from '../../services/answerSource';
 import { VqaSpeakingAssessment, VqaAttempt } from './VqaSpeakingAssessment';
-import { LETTER_CLASS } from '../../utils/text';
+import { LETTER_CLASS } from '../../utils/Text';
 import { ANY_LANGUAGE_LABEL_TOKEN } from '../../utils/languages';
 import { MASTERY_TRANSITION_RE } from '../../utils/transitions';
 

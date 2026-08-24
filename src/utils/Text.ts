@@ -118,6 +118,22 @@ export const SHORT_TOKEN = new RegExp(`^(?:[A-Za-z]{1,10}|${nonLatinRun(1, 10)})
  */
 export const LETTER_CLASS = '\\p{L}\\p{M}';
 
+/**
+ * Native decimal digits, as a class body for building in-page patterns — the digit counterpart
+ * to `LETTER_CLASS`. `\p{Nd}` covers ASCII `0-9` and every script's native decimal-digit block
+ * (e.g. Devanagari `०-९`), so English/ASCII behaviour is unchanged (a strict superset of `\d`)
+ * while a build that renders native digits in a counter ("१२/१६") is no longer silently
+ * unmatched. Any regex built with this MUST carry the `u` flag — `\p{Nd}` is only a Unicode
+ * property escape under `u`; without it, the literal characters `p{Nd}` would be matched instead.
+ *
+ * NOTE: matching the digit RUN is only half of what a native script needs — code that then
+ * parses the matched text as a number (`parseInt`, unary `+`) still only understands ASCII
+ * digits. Untested whether any build actually renders native digits at all (unconfirmed as of
+ * 2026-08-18); if one does, the numeric-parsing side needs its own fix, not assumed to follow
+ * automatically from this class existing.
+ */
+export const DIGIT_CLASS = '\\p{Nd}';
+
 // ============================================
 // Prompt-audio path
 // ============================================

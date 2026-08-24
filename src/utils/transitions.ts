@@ -28,7 +28,7 @@
  */
 
 import { AppLanguage, languageByCode } from './languages';
-import { CopyKey, copyAlt, copyRe } from './uiCopy';
+import { CopyKey, copyAlt, copyRe } from './UiCopy';
 
 /**
  * The `uiCopy` keys for the advance-button vocabulary, named so each site can reference a slot

@@ -1,6 +1,7 @@
 import { expect, Page } from '@playwright/test';
 import { AppLanguage, languageByCode } from '../../utils/languages';
-import { copyRe } from '../../utils/uiCopy';
+import { copyRe, lazyProp } from '../../utils/UiCopy';
+import { findTabByTextClosure } from '../../utils/GeometryLocator';
 
 /**
  * Page Object for the AXL login page (post-2026-08 deployment).
@@ -34,14 +35,19 @@ export class DiscoveryLoginPage {
      * ALL Platform, so its "Skip" is app copy and follows the run's language — the same string
      * `sessionResume` de-hardcoded in P1-9, which reaches this screen by the other path.
      */
-    private readonly micSkipPattern: RegExp;
+    /**
+     * Lazy (`lazyProp`, `uiCopy.ts`): resolved on first read, not at construction — so a
+     * language missing the 'skip' value doesn't stop this class from being constructed at all,
+     * only from calling `skipMicTestIfPresent`/`micTestSkip`.
+     */
+    private readonly micSkipPattern!: RegExp;
 
     /** Grade selected during guest login (options 1..8). Config-driven; default "2". */
     static readonly DEFAULT_GRADE = process.env.GRADE || '2';
 
     constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
-        this.micSkipPattern = copyRe('skip', lang, { exact: true });
+        lazyProp(this, 'micSkipPattern', () => copyRe('skip', lang, { exact: true }));
     }
 
     // ============================================
@@ -89,17 +95,10 @@ export class DiscoveryLoginPage {
      *  which some locator strategies miss) and confirms the guest form is shown. */
     async selectGuestTab(): Promise<void> {
         await this.guestTab().click({ timeout: 5000 }).catch(() => {});
-        if (!(await this.gradeSelect().isVisible({ timeout: 2000 }).catch(() => false))) {
+        const isVisible = await this.gradeSelect().isVisible({ timeout: 2000 }).catch(() => false);
+        if (!isVisible) {
             // fallback: click the tab by its on-screen position
-            const box = await this.page.evaluate(() => {
-                for (const el of Array.from(document.querySelectorAll('[role="tab"], button'))) {
-                    if (((el as HTMLElement).innerText || '').trim() === 'Guest') {
-                        const r = (el as HTMLElement).getBoundingClientRect();
-                        return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
-                    }
-                }
-                return null;
-            });
+            const box = await this.page.evaluate(findTabByTextClosure('Guest'));
             if (box) { await this.page.mouse.click(box.x, box.y); }
             await this.gradeSelect().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         }

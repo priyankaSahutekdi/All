@@ -6,7 +6,7 @@
  * depend on an exact string. Pure + provider-agnostic → unit-testable and reusable for any
  * image/text multiple-choice activity (M4–M9).
  */
-import { normalizeText as normalize } from './text';
+import { normalizeText as normalize } from './Text';
 
 export interface OptionMatch {
     index: number;

@@ -3,25 +3,65 @@ import { AssessmentPage } from '../discovery';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { currentAppFrame } from '../../utils/appFrame';
 import {
-    ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS,
+    ONE_LETTER, ONE_WORD, SHORT_TOKEN, LETTER_CLASS, DIGIT_CLASS,
     LETTER_AUDIO_RE, LETTER_AUDIO_RE_SOURCE, decodeAudioToken,
-} from '../../utils/text';
+} from '../../utils/Text';
 import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../utils/languages';
 import {
     TRANSITION_KEYS, foundationTransitionPriority, transitionAlt, transitionRe,
 } from '../../utils/transitions';
-import { copy, copyAlt, copyRe, copyWordsAlt } from '../../utils/uiCopy';
+import { copy, copyAlt, copyRe, copyWordsAlt, lazyProp } from '../../utils/UiCopy';
+import { letsStartButtonClosure } from '../../utils/GeometryLocator';
 
 const K = TRANSITION_KEYS;
+
+/** The shape `foundationPatterns` resolves, one key per on-screen string this page matches. */
+export interface FoundationCopy {
+    resultMessage: RegExp;
+    startF1: RegExp;
+    startAnyFoundation: RegExp;
+    letsStart: RegExp;
+    helpLanguageModal: RegExp;
+    confirmExact: RegExp;
+    howToPlay: RegExp;
+    practiceStart: RegExp;
+    skipDemoExact: RegExp;
+    nextOrContinueExact: RegExp;
+    letterRecognition: RegExp;
+    letterLauncher: RegExp;
+    memoryChallenge: RegExp;
+    readyForChallenge: RegExp;
+    fuelCounter: RegExp;
+    progressCounter: RegExp;
+    checkSequence: RegExp;
+    sequenceGridReady: RegExp;
+    pastF3: RegExp;
+    feedbackShort: RegExp;
+    feedbackFull: RegExp;
+    completion: RegExp;
+    connectionLost: RegExp;
+    tryAgainExact: RegExp;
+    notAnAnswerOption: RegExp;
+    launcherChrome: RegExp;
+    pastApplyMarkers: RegExp;
+    applyCompletedMarkers: RegExp;
+    labels: {
+        startGame: string;
+        practiceStart: string[];
+    };
+}
 
 /**
  * Every on-screen string this page object matches, resolved for one language.
  *
- * Built once per FoundationPage rather than per call because these patterns gate screen
- * detection inside poll loops that run hundreds of times in a 20-minute level, and because
- * building them up front means a language with a missing translation throws at construction —
- * naming the gap immediately instead of one stalled screen at a time (see uiCopy.ts's DESIGN
- * note on why there is no English fallback).
+ * Each key is defined via `lazyProp` (`uiCopy.ts`) — resolved on first read, not eagerly here.
+ * This used to build every pattern eagerly at construction, which meant a language with even one
+ * missing translation threw at construction time, whether or not the current run ever needed
+ * that key (confirmed live against Hindi — F1-only runs threw on F2/F3-only keys, and even
+ * Discovery-only runs threw immediately on core keys). Resolving lazily means a missing
+ * translation still throws — by design, per uiCopy.ts's DESIGN note, no English fallback — but
+ * only when something actually reads that key, naming the gap at the point it matters instead of
+ * gating construction on every key the class could ever need.
  *
  * Several of these are consumed inside `page.evaluate`, which cannot close over Node scope, so
  * they are passed through as `.source`/`.flags` and rebuilt in-page — the existing idiom in
@@ -30,120 +70,125 @@ const K = TRANSITION_KEYS;
  * Exported so the English-equivalence check can compare each pattern against the inline literal
  * it replaced, rather than the migration being taken on trust.
  */
-export function foundationPatterns(lang: AppLanguage) {
+export function foundationPatterns(lang: AppLanguage): FoundationCopy {
     /** The journey-map entry button for a Foundation level; `code` is an F# regex fragment. */
     const startFoundation = (code: string, space: 'exact' | 'flexible' = 'flexible'): string =>
         copyAlt('startFoundationLevel', lang, { slots: { level: code }, space });
-    /** A "<label>: N/M" readout. The colon is a formatting convention, not translated copy. */
+    /** A "<label>: N/M" readout. The colon is a formatting convention, not translated copy.
+     *  Digits use DIGIT_CLASS (script-agnostic), hence the 'u' flag. */
     const counter = (key: 'fuelLabel' | 'progressLabel'): RegExp =>
-        new RegExp(`${copyAlt(key, lang)}:\\s*(\\d+)\\s*\\/\\s*(\\d+)`, 'i');
+        new RegExp(`${copyAlt(key, lang)}:\\s*([${DIGIT_CLASS}]+)\\s*\\/\\s*([${DIGIT_CLASS}]+)`, 'iu');
 
-    return {
-        /** Discovery result / placement screen message. */
-        resultMessage: copyRe(['learningJourney', 'languageSkills', 'hurray'], lang),
-        /** The F1 landing entry button on the learning-journey map. */
-        startF1: new RegExp(startFoundation('F1'), 'i'),
-        /** Any "Start F#" journey-map entry (opens the next Foundation level). */
-        startAnyFoundation: new RegExp(startFoundation('F\\d+'), 'i'),
-        letsStart: copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }),
+    const p = {} as FoundationCopy;
 
-        helpLanguageModal: copyRe('chooseHelpLanguage', lang),
-        confirmExact: copyRe('confirm', lang, { exact: true }),
+    /** Discovery result / placement screen message. */
+    lazyProp(p, 'resultMessage', () => copyRe(['learningJourney', 'languageSkills', 'hurray'], lang));
+    /** The F1 landing entry button on the learning-journey map. */
+    lazyProp(p, 'startF1', () => new RegExp(startFoundation('F1'), 'i'));
+    /** Any "Start F#" journey-map entry (opens the next Foundation level). */
+    lazyProp(p, 'startAnyFoundation', () => new RegExp(startFoundation('F\\d+'), 'i'));
+    lazyProp(p, 'letsStart', () => copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }));
 
-        howToPlay: copyRe('howToPlay', lang),
-        /** The two ways into a practice from its demo screen. */
-        practiceStart: transitionRe([K.startGame, K.skipDemo], lang),
-        skipDemoExact: copyRe(K.skipDemo, lang, { apostrophe: 'optional', exact: true }),
-        nextOrContinueExact: copyRe([K.next, K.continue], lang, { apostrophe: 'optional', exact: true }),
+    lazyProp(p, 'helpLanguageModal', () => copyRe('chooseHelpLanguage', lang));
+    lazyProp(p, 'confirmExact', () => copyRe('confirm', lang, { exact: true }));
 
-        letterRecognition: copyRe('letterRecognition', lang),
-        letterLauncher: copyRe('letterLauncher', lang),
-        memoryChallenge: copyRe('memoryChallenge', lang),
-        readyForChallenge: copyRe('readyForChallenge', lang),
+    lazyProp(p, 'howToPlay', () => copyRe('howToPlay', lang));
+    /** The two ways into a practice from its demo screen. */
+    lazyProp(p, 'practiceStart', () => transitionRe([K.startGame, K.skipDemo], lang));
+    lazyProp(p, 'skipDemoExact', () => copyRe(K.skipDemo, lang, { apostrophe: 'optional', exact: true }));
+    lazyProp(p, 'nextOrContinueExact', () => copyRe([K.next, K.continue], lang, { apostrophe: 'optional', exact: true }));
 
-        fuelCounter: counter('fuelLabel'),
-        progressCounter: counter('progressLabel'),
-        checkSequence: copyRe('checkSequence', lang),
-        /** The memorize window has ended and the answer grid is live. */
-        sequenceGridReady: new RegExp(
-            [copyAlt('timeUp', lang), copyAlt('lettersOfCount', lang, { slots: { n: '\\d+' } })].join('|'),
-            'i',
-        ),
+    lazyProp(p, 'letterRecognition', () => copyRe('letterRecognition', lang));
+    lazyProp(p, 'letterLauncher', () => copyRe('letterLauncher', lang));
+    lazyProp(p, 'memoryChallenge', () => copyRe('memoryChallenge', lang));
+    lazyProp(p, 'readyForChallenge', () => copyRe('readyForChallenge', lang));
 
-        /** F3 is done — the app has moved to the next-phase journey map. */
-        pastF3: copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang),
+    lazyProp(p, 'fuelCounter', () => counter('fuelLabel'));
+    lazyProp(p, 'progressCounter', () => counter('progressLabel'));
+    lazyProp(p, 'checkSequence', () => copyRe('checkSequence', lang));
+    /** The memorize window has ended and the answer grid is live. Digits use DIGIT_CLASS
+     *  (script-agnostic), hence the 'u' flag. */
+    lazyProp(p, 'sequenceGridReady', () => new RegExp(
+        [copyAlt('timeUp', lang), copyAlt('lettersOfCount', lang, { slots: { n: `[${DIGIT_CLASS}]+` } })].join('|'),
+        'iu',
+    ));
 
-        /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
-        feedbackShort: copyRe(['correct', 'great'], lang),
-        feedbackFull: copyRe(['correct', 'great', 'wellDone'], lang),
-        completion: copyRe(['hurray', 'successfully', 'complete'], lang),
+    /** F3 is done — the app has moved to the next-phase journey map. */
+    lazyProp(p, 'pastF3', () => copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang));
 
-        connectionLost: copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }),
-        tryAgainExact: copyRe('tryAgain', lang, { exact: true }),
+    /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
+    lazyProp(p, 'feedbackShort', () => copyRe(['correct', 'great'], lang));
+    lazyProp(p, 'feedbackFull', () => copyRe(['correct', 'great', 'wellDone'], lang));
+    lazyProp(p, 'completion', () => copyRe(['hurray', 'successfully', 'complete'], lang));
 
-        /**
-         * Button labels that are NOT an answer option — the transition controls plus Confirm.
-         * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
-         * the inline literal was.
-         */
-        notAnAnswerOption: new RegExp([
-            transitionAlt([K.nextLevel], lang),
-            transitionAlt([K.continue], lang),
-            transitionAlt([K.startGame], lang),
-            transitionAlt([K.skipDemo], lang),
-            `^${transitionAlt([K.next], lang)}$`,
-            copyAlt('confirm', lang),
-            transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
-        ].join('|'), 'i'),
+    lazyProp(p, 'connectionLost', () => copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }));
+    lazyProp(p, 'tryAgainExact', () => copyRe('tryAgain', lang, { exact: true }));
 
-        /**
-         * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
-         * words are derived from the game titles rather than re-listed, so they cannot drift
-         * away from them.
-         */
-        launcherChrome: new RegExp(
-            `^(?:${ANY_LANGUAGE_LABEL.source}|`
-            + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
-            'iu',
-        ),
+    /**
+     * Button labels that are NOT an answer option — the transition controls plus Confirm.
+     * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
+     * the inline literal was.
+     */
+    lazyProp(p, 'notAnAnswerOption', () => new RegExp([
+        transitionAlt([K.nextLevel], lang),
+        transitionAlt([K.continue], lang),
+        transitionAlt([K.startGame], lang),
+        transitionAlt([K.skipDemo], lang),
+        `^${transitionAlt([K.next], lang)}$`,
+        copyAlt('confirm', lang),
+        transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+    ].join('|'), 'i'));
 
-        /**
-         * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
-         * definitive checks at their call sites, not assertions on their own.
-         *
-         * `F2` stays a literal: F# is a level CODE the app renders identically in every language
-         * (`foundationLevel()` reads it out of `img[alt]`), not translated copy. The
-         * "<word> <number>" ordering IS an assumption that may not hold in another language —
-         * recorded as a known limitation rather than papered over, because both patterns are
-         * backed by a definitive check at the call site.
-         */
-        pastApplyMarkers: new RegExp([
-            copyAlt('complete', lang),
-            copyAlt('congratulations', lang),
-            copyAlt('wellDone', lang),
-            'F2',
-            `${copyAlt('levelWord', lang)} 2`,
-            `${copyAlt('foundationWord', lang)} 2`,
-            copyAlt('hurray', lang),
-        ].join('|'), 'i'),
-        applyCompletedMarkers: new RegExp([
-            copyAlt('complete', lang),
-            copyAlt('congratulations', lang),
-            copyAlt('wellDone', lang),
-            copyAlt('foundationWord', lang),
-            `${copyAlt('levelWord', lang)} \\d`,
-            startFoundation('F\\d', 'exact'),
-        ].join('|'), 'i'),
+    /**
+     * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
+     * words are derived from the game titles rather than re-listed, so they cannot drift
+     * away from them.
+     */
+    lazyProp(p, 'launcherChrome', () => new RegExp(
+        `^(?:${ANY_LANGUAGE_LABEL.source}|`
+        + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
+        'iu',
+    ));
 
-        /** Plain (non-regex) labels, for the `getByText(exact)` call sites. */
-        labels: {
-            startGame: copy(K.startGame, lang)[0],
-            practiceStart: copy([K.startGame, K.skipDemo], lang),
-        },
-    };
+    /**
+     * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
+     * definitive checks at their call sites, not assertions on their own.
+     *
+     * `F2` stays a literal: F# is a level CODE the app renders identically in every language
+     * (`foundationLevel()` reads it out of `img[alt]`), not translated copy. The
+     * "<word> <number>" ordering IS an assumption that may not hold in another language —
+     * recorded as a known limitation rather than papered over, because both patterns are
+     * backed by a definitive check at the call site.
+     */
+    lazyProp(p, 'pastApplyMarkers', () => new RegExp([
+        copyAlt('complete', lang),
+        copyAlt('congratulations', lang),
+        copyAlt('wellDone', lang),
+        'F2',
+        `${copyAlt('levelWord', lang)} 2`,
+        `${copyAlt('foundationWord', lang)} 2`,
+        copyAlt('hurray', lang),
+    ].join('|'), 'i'));
+    /** Digits in the `levelWord` fragment use DIGIT_CLASS (script-agnostic), hence 'u'.
+     *  `startFoundation('F\\d', ...)`'s F# stays ASCII — it's a level CODE, not translated
+     *  copy, rendered identically in every language (see the class-level note above). */
+    lazyProp(p, 'applyCompletedMarkers', () => new RegExp([
+        copyAlt('complete', lang),
+        copyAlt('congratulations', lang),
+        copyAlt('wellDone', lang),
+        copyAlt('foundationWord', lang),
+        `${copyAlt('levelWord', lang)} [${DIGIT_CLASS}]`,
+        startFoundation('F\\d', 'exact'),
+    ].join('|'), 'iu'));
+
+    /** Plain (non-regex) labels, for the `getByText(exact)` call sites. */
+    lazyProp(p, 'labels', () => ({
+        startGame: copy(K.startGame, lang)[0],
+        practiceStart: copy([K.startGame, K.skipDemo], lang),
+    }));
+
+    return p;
 }
-
-export type FoundationCopy = ReturnType<typeof foundationPatterns>;
 
 /**
  * Why a node solver stopped.
@@ -190,8 +235,13 @@ export class FoundationPage {
     private lhNetLetter: string | null = null;   // target letter from the network (backup to the play() hook)
     /** Every screen string this page matches, resolved for the run's language. */
     private readonly copy: FoundationCopy;
-    /** The advance-button matchers, in priority order, for the run's language. */
-    private readonly transitions: RegExp[];
+    /**
+     * The advance-button matchers, in priority order, for the run's language. Lazy (`lazyProp`,
+     * `uiCopy.ts`): `foundationTransitionPriority` resolves 5 patterns immediately when called,
+     * so this field is resolved as one unit on first read (by `clickChallengeAdvance`) rather
+     * than at construction — same reasoning as `copy` above.
+     */
+    private readonly transitions!: RegExp[];
 
     /**
      * `lang` defaults to English so the parked Mastery specs (out of scope per the 2026-08-18
@@ -201,7 +251,7 @@ export class FoundationPage {
     constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
         this.copy = foundationPatterns(lang);
-        this.transitions = foundationTransitionPriority(lang);
+        lazyProp(this, 'transitions', () => foundationTransitionPriority(lang));
         // Reuse the Discovery assessment page's centred record/stop toggle for the
         // Letter Train "say the word" mic (same 70x70 centre control).
         this.assess = new AssessmentPage(page, lang);
@@ -246,18 +296,7 @@ export class FoundationPage {
         const byText = this.page.getByText(this.copy.letsStart).first();
         if (await byText.click({ timeout: 4000 }).then(() => true).catch(() => false)) return;
 
-        const c = await this.page.evaluate(() => {
-            for (const n of Array.from(document.querySelectorAll('div, button, svg'))) {
-                const el = n as HTMLElement;
-                const r = el.getBoundingClientRect();
-                const cx = r.x + r.width / 2, cy = r.y + r.height / 2;
-                if (cx < 520 || cx > 760 || cy < 380 || cy > 560) continue;  // lower-centre
-                if (r.width < 80 || r.width > 320 || r.height < 28 || r.height > 90) continue;
-                if (getComputedStyle(el).cursor !== 'pointer') continue;
-                return { x: cx, y: cy };
-            }
-            return null;
-        });
+        const c = await this.page.evaluate(letsStartButtonClosure());
         await this.page.mouse.click(c ? c.x : 640, c ? c.y : 472);
     }
 
@@ -417,23 +456,27 @@ export class FoundationPage {
      * the Letter Hunt practice / Apply "/10" and any small level counter (e.g. "1/3").
      */
     async trainProgress(): Promise<string> {
-        return await this.page.evaluate(() => {
+        return await this.page.evaluate((digitClass) => {
             const text = document.body.innerText;
             // Fast path: the classic 16-item counter (L1–L5). Text-only → flicker-proof,
             // and never matches the Letter Hunt practice / Apply, so their detection is
-            // unchanged.
-            const m16 = text.match(/(\d+)\s*\/\s*16/);
+            // unchanged. The numerator uses DIGIT_CLASS (script-agnostic); the "16" stays an
+            // ASCII literal — unverified whether a build with native digits would render its
+            // denominators natively too, in which case this fast path would simply miss (falling
+            // through to the general match below, which still requires ASCII `parseInt` on the
+            // denominator — see DIGIT_CLASS's own note in text.ts on the numeric-parsing gap).
+            const m16 = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*16`, 'u'));
             if (m16) return m16[0];
             // Other lesson lengths (e.g. L6 = /14). Match a counter whose denominator is
             // a train length (>= 11) — TEXT-only so it stays flicker-proof through item
             // transitions, and it excludes the practice/Apply "/10" and any small level
             // counter (e.g. "1/3"), so those are never mistaken for a Letter Train.
-            const all = text.match(/(\d+)\s*\/\s*(\d+)/g) || [];
+            const all = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*([${digitClass}]+)`, 'gu')) || [];
             for (const s of all) {
                 if (parseInt(s.split('/')[1], 10) >= 11) return s.trim();
             }
             return '';
-        });
+        }, DIGIT_CLASS);
     }
 
     /** True when a Letter Hunt "How to Play" practice/demo screen is showing. */

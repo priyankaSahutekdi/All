@@ -1,14 +1,13 @@
 import { test, expect } from '../../fixtures/appTest';
-import {
-    DiscoveryLoginPage,
-    MicrophoneTestPage,
-    AssessmentPage,
-} from '../../pages/discovery';
+// MicrophoneTestPage is deliberately NOT imported: it was constructed here and never used, and
+// it has zero call sites anywhere (confirmed in Phase 1). Its fate is HINDI_READINESS_PLAN.md
+// P3-8 — deleted or wired in, not left as a variable that implies it does something.
+import { DiscoveryLoginPage, AssessmentPage } from '../../pages/discovery';
 import { FoundationPage } from '../../pages/foundation';
 import { MasteryPage } from '../../pages/mastery/MasteryPage';
 import { DiscoveryHelper } from '../../utils/DiscoveryHelper';
 import { ANY_LANGUAGE_LABEL_TOKEN, labelRe } from '../../utils/languages';
-import { copy, copyRe } from '../../utils/uiCopy';
+import { copy, copyRe } from '../../utils/UiCopy';
 
 /**
  * Full end-to-end Discovery + F-series flow — TC-001 → TC-013 — executed in a SINGLE
@@ -32,7 +31,6 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         const DEMO_SENTENCE = discoveryData.demoSentence;
 
         const loginPage = new DiscoveryLoginPage(page, lang);
-        const micPage = new MicrophoneTestPage(page);
         const assess = new AssessmentPage(page, lang);
         const foundation = new FoundationPage(page, lang);
         const user = DiscoveryHelper.createTestUser();

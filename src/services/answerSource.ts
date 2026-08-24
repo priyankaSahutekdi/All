@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 import { VisionService } from './visionService';
-import { normalizeText as normalize } from '../utils/text';
+import { normalizeText as normalize } from '../utils/Text';
 
 /**
  * Pluggable "answer source" for picture-based multiple-choice assessments (Mastery S-nodes;
