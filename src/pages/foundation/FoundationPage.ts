@@ -232,6 +232,7 @@ const gaveUp = (reason: string): SolverResult => ({ completed: false, reason });
  */
 export class FoundationPage {
     private page: Page;
+    private lang: AppLanguage;
     private assess: AssessmentPage;
     private lhNetLetter: string | null = null;   // target letter from the network (backup to the play() hook)
     /** Every screen string this page matches, resolved for the run's language. */
@@ -251,6 +252,7 @@ export class FoundationPage {
      */
     constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
+        this.lang = lang;
         this.copy = foundationPatterns(lang);
         lazyProp(this, 'transitions', () => foundationTransitionPriority(lang));
         // Reuse the Discovery assessment page's centred record/stop toggle for the
@@ -641,7 +643,7 @@ export class FoundationPage {
                 // (TTS), start recording, then play the word into the mic stream so the
                 // app records the ACTUAL word audio (not Chromium's fake tone).
                 const word = await this.readCurrentWord();
-                const b64 = word ? TtsHelper.generateWavBase64(word) : '';
+                const b64 = word ? TtsHelper.generateWavBase64(word, this.lang) : '';
                 await this.assess.clickRecordToggle();   // start recording (records our stream)
                 await this.page.waitForTimeout(300);
                 if (b64) {
