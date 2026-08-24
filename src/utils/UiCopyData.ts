@@ -29,7 +29,7 @@
  * out of `img[alt]`).
  *
  * POPULATING A LANGUAGE: values must be OBSERVED on a real build of that language, never
- * translated or guessed — the same standing rule as src/testdata/hindi/README.md. Hindi is
+ * translated or guessed — the same standing rule as src/docs/LANGUAGE_ONBOARDING.md (Appendix B). Hindi is
  * intentionally absent below rather than filled with plausible translations.
  */
 import { AppLanguage } from './languages';
@@ -48,14 +48,14 @@ export const UI_COPY = {
      * screen's Skip button (`DiscoveryLoginPage.micSkipPattern`, `sessionResume.ts`), which H2a
      * (2026-08-19) proved renders "Skip" in fixed English on a live Hindi-targeted run — that
      * screen is reached before the app has been told any language, so there is no Hindi string
-     * to observe here. See `DECISIONS.md` D-10 and `EXECUTION_LOG.md` EL-7.
+     * to observe here. See `HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10 and `HINDI_ROLLOUT_LOG.md (Execution Log section)` EL-7.
      */
     skip: { english: 'Skip' },
     /**
      * Hindi value is TC-003's learning-language dropdown confirm ("भाषा चुनें" popup), observed
      * live via H2a (2026-08-19) — NOT the help-language popup's Confirm (TC-002), which renders
      * fixed English for the same reason as `skip` above and is matched via a hardcoded literal
-     * at its own call site instead of this key. See `DECISIONS.md` D-10.
+     * at its own call site instead of this key. See `HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10.
      */
     confirm: { english: 'Confirm', hindi: 'कन्फर्म करें' },
     /** English-only — TC-002's help-language popup renders fixed English; see `confirm` above. */

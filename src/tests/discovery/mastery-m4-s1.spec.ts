@@ -48,7 +48,7 @@ import { resumeParkedAccount } from '../../utils/sessionResume';
  *    driver probed for a dev submit hook and found NONE) and every outcome was `timeout`:
  *    the question never advanced, no TRY AGAIN appeared, and lives never changed, so nothing
  *    was graded. Automation cannot complete TC-024 until the app ships a submit path or the
- *    test hook specified in docs/S1_DEV_HOOK_REQUEST.md (the consumer is already wired:
+ *    test hook specified in docs/BUILD_HISTORY.md (Outstanding Dev Request section) (the consumer is already wired:
  *    VqaSpeakingAssessment.submitViaHook auto-detects it, so this test flips green with no
  *    code change). Kept as fixme — tracked as pending, never a false pass.
  */

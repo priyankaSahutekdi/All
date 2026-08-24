@@ -39,7 +39,7 @@ export class MicrophoneTestPage {
      * happen (playwright/no-networkidle flags exactly this). Waiting for the Skip control is the
      * meaningful signal that the screen is usable.
      *
-     * NOTE: this whole class still has ZERO call sites — its fate is HINDI_READINESS_PLAN.md P3-8
+     * NOTE: this whole class still has ZERO call sites — its fate is HINDI_ROLLOUT_LOG.md (Readiness Plan section) P3-8
      * (delete it, or wire it in and de-hardcode its 'Skip'). This change makes `npm run lint` green
      * so it can gate CI; it does not pre-empt that decision.
      */

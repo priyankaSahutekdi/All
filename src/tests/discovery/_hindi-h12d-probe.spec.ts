@@ -5,7 +5,7 @@
 // version that logs the solver's own result and polls raw screen text. DO NOT COMMIT.
 import { test, expect } from '../../fixtures/appTest';
 // MicrophoneTestPage is deliberately NOT imported: it was constructed here and never used, and
-// it has zero call sites anywhere (confirmed in Phase 1). Its fate is HINDI_READINESS_PLAN.md
+// it has zero call sites anywhere (confirmed in Phase 1). Its fate is HINDI_ROLLOUT_LOG.md (Readiness Plan section)
 // P3-8 — deleted or wired in, not left as a variable that implies it does something.
 import { DiscoveryLoginPage, AssessmentPage } from '../../pages/discovery';
 import { FoundationPage } from '../../pages/foundation';
@@ -32,7 +32,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
 
         // Per-language literal, loaded at runtime from testdata/<lang>/discovery-data.json.
         // Was an inline literal, then a static english/ import — neither could follow a Hindi
-        // run. It now arrives via the `discoveryData` fixture (REFACTORING_PLAN.md R5 + R1).
+        // run. It now arrives via the `discoveryData` fixture (BUILD_HISTORY.md (Refactoring Plan section) R5 + R1).
         const DEMO_SENTENCE = discoveryData.demoSentence;
 
         const loginPage = new DiscoveryLoginPage(page, lang);
@@ -72,7 +72,7 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
          * TC-002's help-language popup Confirm — FIXED ENGLISH, not `lang`. H2a (2026-08-19)
          * proved live that this screen renders "Confirm" in English regardless of the run's
          * target language (the app has not been told which language the user wants yet at this
-         * point in the flow — that happens later, at TC-003). This is H-1 (`DECISIONS.md` D-10).
+         * point in the flow — that happens later, at TC-003). This is H-1 (`HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10).
          * Do not confuse with TC-003's OWN Confirm button below, which correctly follows `lang`.
          */
         const confirmLabel = copy('confirm', languageByCode('english'))[0];

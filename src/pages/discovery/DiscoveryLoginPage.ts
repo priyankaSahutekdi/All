@@ -34,9 +34,9 @@ export class DiscoveryLoginPage {
      * here used to claim its "Skip" is app copy that follows the run's language, on the theory
      * that the mic-calibration screen is already inside the ALL Platform. **H2a (2026-08-19)
      * disproved that theory live**: on a real `--lang=hindi` run this screen still rendered
-     * "Skip" in English (`EXECUTION_LOG.md` EL-7) — because the app has not yet been told which
+     * "Skip" in English (`HINDI_ROLLOUT_LOG.md (Execution Log section)` EL-7) — because the app has not yet been told which
      * language the user wants at this point in the flow (that happens later, at the TC-003
-     * learning-language switcher). This is H-1 (`DECISIONS.md` D-10); `skip` in `uiCopy.ts` is
+     * learning-language switcher). This is H-1 (`HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10); `skip` in `uiCopy.ts` is
      * therefore English-only on purpose, and this pattern resolves it in English UNCONDITIONALLY
      * — not in `lang` — regardless of what language the run targets.
      */

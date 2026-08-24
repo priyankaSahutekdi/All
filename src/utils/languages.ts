@@ -13,7 +13,7 @@
  *
  * Scope note: this is the app's language *vocabulary*, not the LANG selection axis. Choosing
  * which language a run targets (env var, config, reporting) is a later, separate change —
- * REFACTORING_PLAN.md R1/R8. This module deliberately holds no defaults and reads no env.
+ * BUILD_HISTORY.md (Refactoring Plan section) R1/R8. This module deliberately holds no defaults and reads no env.
  */
 
 import { LETTER_CLASS } from './Text';

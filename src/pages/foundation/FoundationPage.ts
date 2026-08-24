@@ -439,7 +439,7 @@ export class FoundationPage {
      * @deprecated Use `switchToLanguage('english')`. Kept so the existing F2/F3/M specs are
      * untouched by this change — they are the green baseline, and churning five call sites in
      * the same commit that rewrites the implementation would make a regression harder to
-     * attribute. Call sites move over with the LANG axis work (REFACTORING_PLAN.md R1/R3).
+     * attribute. Call sites move over with the LANG axis work (BUILD_HISTORY.md (Refactoring Plan section) R1/R3).
      */
     async switchToEnglishForF2(): Promise<void> {
         await this.switchToLanguage('english');

@@ -52,7 +52,7 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
             //
             // This used to be an unconditional test.skip(), which is the finding: a skip that
             // can never stop happening reports as "not run" forever while the surrounding docs
-            // go on showing this test as covered (PROJECT_CONTEXT.md still lists TC-021 as ✅).
+            // go on showing this test as covered (BUILD_HISTORY.md (Project Context section) still lists TC-021 as ✅).
             // Nobody has to look at it, so nobody does, and F3 quietly stops being tested.
             //
             // It is now a FAILURE, correctly attributed to account state rather than to code.

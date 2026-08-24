@@ -35,7 +35,7 @@ const dataDir = (lang: AppLanguage): string => path.join(__dirname, lang.code);
  *
  * Fails with the reason rather than a raw ENOENT/MODULE_NOT_FOUND, because the expected
  * failure here is "this language has not been populated yet" (Hindi is deliberately empty
- * until it has been observed on a real build — see testdata/hindi/README.md), and that
+ * until it has been observed on a real build — see docs/LANGUAGE_ONBOARDING.md (Appendix B)), and that
  * diagnosis should not require reading a stack trace.
  */
 function readData<T>(lang: AppLanguage, file: string): T {

@@ -168,7 +168,7 @@ export class VqaSpeakingAssessment {
 
     /**
      * Submit the chosen answer via an APP TEST HOOK if the build exposes one (bypasses the
-     * real-microphone requirement — see docs/S1_DEV_HOOK_REQUEST.md for the contract).
+     * real-microphone requirement — see docs/BUILD_HISTORY.md (Outstanding Dev Request section) for the contract).
      * Feature-detected: returns true only if a hook was actually invoked, so builds without
      * the hook are unaffected. Accepts several names so it works with whatever the app ships.
      */

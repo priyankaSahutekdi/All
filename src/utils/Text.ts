@@ -66,7 +66,7 @@ export function normalizeText(s: string): string {
 // Lengths are counted in BASE LETTERS on both branches (see nonLatinRun), so the same
 // {min,max} means the same thing in either script even though one Devanagari akshara can
 // span several code points (क + ् + ष). The numbers are still the English-derived ones and
-// have not been checked against a real Hindi screen -- revisit after REFACTORING_PLAN.md
+// have not been checked against a real Hindi screen -- revisit after BUILD_HISTORY.md (Refactoring Plan section)
 // task 13.
 //
 // Consumed inside page.evaluate(), which cannot close over Node scope, so callers pass
@@ -154,7 +154,7 @@ export const DIGIT_CLASS = '\\p{Nd}';
  * NOTE (unverified): whether a Hindi build actually serves Devanagari filenames, percent-
  * encoded ones, or transliterated ASCII has NOT been observed on a real build. This widening
  * plus `decodeAudioToken` covers the first two; if the real build transliterates, the token
- * will need mapping instead. Confirm before trusting a Hindi run (REFACTORING_PLAN.md task 13).
+ * will need mapping instead. Confirm before trusting a Hindi run (BUILD_HISTORY.md (Refactoring Plan section) task 13).
  */
 export const LETTER_AUDIO_RE = /\/letter\/([^/]+)\.wav/i;
 

@@ -4,7 +4,7 @@
  * THROWAWAY / LOCAL-ONLY — H2a Hindi observation probe. DO NOT COMMIT.
  * ============================================================================
  *
- * Purpose (HINDI_READINESS_PLAN.md Phase 4, task H2a): observe REAL Hindi app behaviour —
+ * Purpose (HINDI_ROLLOUT_LOG.md (Readiness Plan section) Phase 4, task H2a): observe REAL Hindi app behaviour —
  * screen text, audio URLs, counters, geometry — before writing any Hindi fix. This file does
  * not become part of the permanent framework. It exists to produce evidence, not to pass/fail
  * a suite.
@@ -327,7 +327,7 @@ test.describe('@Throwaway Hindi Discovery+F1 observation probe (H2a, not committ
             // have never been observed. This step exists solely to observe those 3 strings plus
             // the Continue button, for both assessment rounds — a cap high enough that completion
             // is reached for real (English needed 3 items for Assessment 1, 5 for Assessment 2;
-            // see EXECUTION_LOG.md EL-9), not the old diagnostic-only 4-item probe.) ----
+            // see HINDI_ROLLOUT_LOG.md (Execution Log section) EL-9), not the old diagnostic-only 4-item probe.) ----
             const ASSESSMENT_ITEM_CAP = 8;
             const runAssessmentRound = async (roundLabel: string): Promise<void> => {
                 await test.step(`H2a-6 (${roundLabel}): drive to real completion (capped at ${ASSESSMENT_ITEM_CAP} items)`, async () => {

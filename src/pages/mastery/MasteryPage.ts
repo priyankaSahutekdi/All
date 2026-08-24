@@ -5,7 +5,7 @@ import { FoundationPage } from '../foundation/FoundationPage';
 import { TtsHelper } from '../../utils/TtsHelper';
 import { AnswerSource } from '../../services/answerSource';
 import { VqaSpeakingAssessment, VqaAttempt } from './VqaSpeakingAssessment';
-import { LETTER_CLASS } from '../../utils/text';
+import { LETTER_CLASS } from '../../utils/Text';
 import { ANY_LANGUAGE_LABEL_TOKEN } from '../../utils/languages';
 import { MASTERY_TRANSITION_RE } from '../../utils/transitions';
 
@@ -98,7 +98,7 @@ export class MasteryPage {
         const word = await this.page.evaluate((cls) => {
             // NOTE: the "Did you see the word?" prompt itself is still an English literal —
             // its localized wording has to be read off the real Hindi build before it can be
-            // keyed by language (REFACTORING_PLAN.md task 13). Only the captured word's
+            // keyed by language (BUILD_HISTORY.md (Refactoring Plan section) task 13). Only the captured word's
             // character class is script-agnostic here.
             const m = document.body.innerText.replace(/\s+/g, ' ')
                 .match(new RegExp(`Did you see the word\\?\\s*([${cls}']+)`, 'iu'));

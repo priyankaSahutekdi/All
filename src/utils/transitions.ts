@@ -101,6 +101,6 @@ export function masteryTransitionRe(lang: AppLanguage): RegExp {
  * English-built constant, kept because `MasteryPage` still consumes it directly. Mastery is
  * parked out of scope by the 2026-08-18 TC-022 scope decision, so it is not being re-plumbed to
  * take a language yet — `masteryTransitionRe(lang)` above is what it moves to when that scope
- * opens (HINDI_READINESS_PLAN.md P2-1c).
+ * opens (HINDI_ROLLOUT_LOG.md (Readiness Plan section) P2-1c).
  */
 export const MASTERY_TRANSITION_RE = masteryTransitionRe(languageByCode('english'));

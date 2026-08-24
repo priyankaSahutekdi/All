@@ -68,7 +68,7 @@ export async function resumeParkedAccount(
         // which language the user wants yet at this point in the flow. The comment this replaced
         // ("a hardcoded /^Skip$/i simply never matches on a non-English build") was P1-9's
         // untested assumption, not an observation — H2a's live evidence corrects it. See
-        // `DECISIONS.md` D-10, `EXECUTION_LOG.md` EL-7.
+        // `HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10, `HINDI_ROLLOUT_LOG.md (Execution Log section)` EL-7.
         const skip = page.getByRole('button', { name: copyRe('skip', languageByCode('english'), { exact: true }) }).first();
         if (await skip.isVisible({ timeout: opts.micSkip.timeoutMs }).catch(() => false)) {
             await skip.click({ force: true });
