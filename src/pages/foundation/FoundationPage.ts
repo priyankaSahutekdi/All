@@ -1397,8 +1397,14 @@ export class FoundationPage {
      * "Try Again" button alone (games have their own TRY AGAIN for wrong answers).
      */
     async recoverIfDisconnected(maxAttempts = 3): Promise<boolean> {
-        const isDown = async (): Promise<boolean> =>
-            await this.pageTextMatchesAll(this.copy.connectionLost).catch(() => false);
+        // `this.copy.connectionLost` is a lazy getter that can itself throw (e.g. a
+        // language with no translation for its keys yet) — deferring the access into the
+        // `.then()` keeps that throw inside the promise chain the trailing `.catch()`
+        // covers, instead of escaping synchronously before `pageTextMatchesAll` is even
+        // called. This check must never throw: it is a safety net, not an assertion.
+        const isDown = async (): Promise<boolean> => Promise.resolve()
+            .then(() => this.pageTextMatchesAll(this.copy.connectionLost))
+            .catch(() => false);
 
         if (!await isDown()) return false;
 
