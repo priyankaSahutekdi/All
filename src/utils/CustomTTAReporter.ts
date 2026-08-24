@@ -64,6 +64,18 @@ interface SuiteStats {
     flaky: number;
 }
 
+/** Per-run summary sidecar written next to each `report_<runId>.html` — see writeRunSummary(). */
+interface RunSummary {
+    passed: number;
+    failed: number;
+    skipped: number;
+    total: number;
+    durationMs: number;
+    env: string;
+    mode: string;
+    startedAt: string;
+}
+
 class CustomTTAReporter implements Reporter {
     private testResults: TestData[] = [];
     private fileGroups: Map<string, FileGroup> = new Map();
@@ -94,6 +106,7 @@ class CustomTTAReporter implements Reporter {
         console.log(`║  📅 Started: ${this.startTime.toLocaleString().padEnd(47)}║`);
         console.log(`║  📊 Total Tests: ${String(totalTests).padEnd(44)}║`);
         console.log(`║  🌐 Environment: ${(process.env.TEST_ENV || 'UAT').padEnd(44)}║`);
+        console.log(`║  🖥️  Mode: ${(process.env.TEST_MODE || 'headless').padEnd(50)}║`);
         console.log('╚════════════════════════════════════════════════════════════════╝\n');
 
         this.initializeLiveReport();
@@ -590,6 +603,7 @@ class CustomTTAReporter implements Reporter {
 
         const html = this.generateHTML();
         fs.writeFileSync(this.outputFile, html);
+        this.writeRunSummary(reportDir);
 
         const indexPath = path.join(reportDir, 'index.html');
         const latestRedirect = `<!DOCTYPE html>
@@ -599,6 +613,36 @@ class CustomTTAReporter implements Reporter {
         fs.writeFileSync(indexPath, latestRedirect);
 
         this.generateHistoryPage(reportDir);
+    }
+
+    /**
+     * A small JSON sidecar next to each `report_<runId>.html`, holding just enough to render
+     * a per-run summary badge in history.html — without history.html having to scrape HTML
+     * (fragile) or this reporter having to keep every past run's full TestData in memory.
+     */
+    private writeRunSummary(reportDir: string): void {
+        const summary: RunSummary = {
+            passed: this.suiteStats.passed,
+            failed: this.suiteStats.failed,
+            skipped: this.suiteStats.skipped,
+            total: this.suiteStats.total,
+            durationMs: this.endTime.getTime() - this.startTime.getTime(),
+            env: process.env.TEST_ENV || 'UAT',
+            mode: process.env.TEST_MODE || 'headless',
+            startedAt: this.startTime.toISOString(),
+        };
+        const summaryPath = path.join(reportDir, `${path.basename(this.outputFile, '.html')}.json`);
+        fs.writeFileSync(summaryPath, JSON.stringify(summary));
+    }
+
+    /** Read a report's summary sidecar, if one exists (older reports predate this and have none). */
+    private readRunSummary(reportDir: string, reportFile: string): RunSummary | null {
+        const summaryPath = path.join(reportDir, `${path.basename(reportFile, '.html')}.json`);
+        try {
+            return JSON.parse(fs.readFileSync(summaryPath, 'utf-8')) as RunSummary;
+        } catch {
+            return null;   // no sidecar (pre-existing report) — history.html falls back to name + date only
+        }
     }
 
     private generateHistoryPage(reportDir: string): void {
@@ -616,12 +660,20 @@ class CustomTTAReporter implements Reporter {
         body { font-family: 'Segoe UI', sans-serif; background: #f5f5f5; padding: 20px; }
         .header { background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 20px; text-align: center; margin-bottom: 20px; border-radius: 8px; }
         .report-list { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .report-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .report-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
         .report-item:hover { background: #f0fdf4; }
         .report-link { color: #059669; text-decoration: none; font-weight: 500; }
         .report-link:hover { text-decoration: underline; }
+        .report-meta { display: flex; align-items: center; gap: 10px; }
         .report-date { color: #666; font-size: 12px; }
         .latest-badge { background: #10b981; color: white; padding: 2px 8px; border-radius: 10px; font-size: 11px; margin-left: 10px; }
+        .run-badges { display: flex; gap: 6px; font-size: 11px; font-weight: 600; }
+        .run-badge { padding: 2px 9px; border-radius: 10px; color: white; white-space: nowrap; }
+        .run-badge.passed { background: #22c55e; }
+        .run-badge.failed { background: #ef4444; }
+        .run-badge.skipped { background: #94a3b8; }
+        .run-badge.env { background: #eef2ff; color: #4338ca; }
+        .run-badge.duration { background: #f1f5f9; color: #475569; }
     </style>
 </head>
 <body>
@@ -631,9 +683,22 @@ class CustomTTAReporter implements Reporter {
             const match = f.match(/report_(\d{4})(\d{2})(\d{2})_(\d{2})(\d{2})(\d{2})\.html/);
             const dateStr = match ? `${match[1]}-${match[2]}-${match[3]} ${match[4]}:${match[5]}:${match[6]}` : f;
             const latestBadge = i === 0 ? '<span class="latest-badge">LATEST</span>' : '';
+            const summary = this.readRunSummary(reportDir, f);
+            const badges = summary
+                ? `<div class="run-badges">
+                    <span class="run-badge passed">✅ ${summary.passed}</span>
+                    <span class="run-badge failed">❌ ${summary.failed}</span>
+                    <span class="run-badge skipped">⏭️ ${summary.skipped}</span>
+                    <span class="run-badge duration">${this.formatDuration(summary.durationMs)}</span>
+                    <span class="run-badge env">${summary.env}/${summary.mode}</span>
+                </div>`
+                : '';
             return `<div class="report-item">
-                <a href="${f}" class="report-link">${f}${latestBadge}</a>
-                <span class="report-date">${dateStr}</span>
+                <div class="report-meta">
+                    <a href="${f}" class="report-link">${f}${latestBadge}</a>
+                    <span class="report-date">${dateStr}</span>
+                </div>
+                ${badges}
             </div>`;
         }).join('\n')}
     </div>
@@ -727,6 +792,10 @@ class CustomTTAReporter implements Reporter {
             <div class="meta-item">
                 <span class="meta-label">Environment</span>
                 <span class="env-badge">🌐 ${env.toUpperCase()}</span>
+            </div>
+            <div class="meta-item">
+                <span class="meta-label">Mode</span>
+                <span class="env-badge">🖥️ ${(process.env.TEST_MODE || 'headless').toUpperCase()}</span>
             </div>
             <div class="meta-item">
                 <span class="meta-label">Browser</span>
