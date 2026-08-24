@@ -29,9 +29,9 @@ test.describe('@P0 @Smoke @Discovery Discovery + F-series E2E (single session, s
         // run. It now arrives via the `discoveryData` fixture (REFACTORING_PLAN.md R5 + R1).
         const DEMO_SENTENCE = discoveryData.demoSentence;
 
-        const loginPage = new DiscoveryLoginPage(page);
+        const loginPage = new DiscoveryLoginPage(page, lang);
         const micPage = new MicrophoneTestPage(page);
-        const assess = new AssessmentPage(page);
+        const assess = new AssessmentPage(page, lang);
         const foundation = new FoundationPage(page, lang);
         const user = DiscoveryHelper.createTestUser();
         console.log(`[E2E] single user: ${user.username} (password == username)`);

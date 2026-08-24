@@ -165,10 +165,9 @@ export class FoundationPage {
     private page: Page;
     private assess: AssessmentPage;
     private lhNetLetter: string | null = null;   // target letter from the network (backup to the play() hook)
-    /** The run's language, and every screen string resolved for it. */
-    private readonly lang: AppLanguage;
+    /** Every screen string this page matches, resolved for the run's language. */
     private readonly copy: FoundationCopy;
-    /** The advance-button matchers, in priority order, for `this.lang`. */
+    /** The advance-button matchers, in priority order, for the run's language. */
     private readonly transitions: RegExp[];
 
     /**
@@ -178,12 +177,11 @@ export class FoundationPage {
      */
     constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
-        this.lang = lang;
         this.copy = foundationPatterns(lang);
         this.transitions = foundationTransitionPriority(lang);
         // Reuse the Discovery assessment page's centred record/stop toggle for the
         // Letter Train "say the word" mic (same 70x70 centre control).
-        this.assess = new AssessmentPage(page);
+        this.assess = new AssessmentPage(page, lang);
     }
 
     /**

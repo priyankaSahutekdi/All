@@ -1,4 +1,6 @@
 import { expect, Page } from '@playwright/test';
+import { AppLanguage, languageByCode } from '../../utils/languages';
+import { copyRe } from '../../utils/uiCopy';
 
 /**
  * Page Object for the AXL login page (post-2026-08 deployment).
@@ -19,12 +21,27 @@ import { expect, Page } from '@playwright/test';
  */
 export class DiscoveryLoginPage {
     private page: Page;
+    /**
+     * The mic-calibration "Skip" pattern for the run's language.
+     *
+     * WHERE THE LANGUAGE BOUNDARY IS on this page: everything down to "Continue to ALL" belongs
+     * to the AXL PLATFORM SHELL, which is reached before any learning-app language exists — the
+     * language switcher lives inside the ALL Platform, i.e. after that button. Those labels are
+     * therefore left as literals deliberately, not by omission. Whether the AXL shell localizes
+     * at all has NOT been observed on a non-English build (HINDI_READINESS_PLAN.md P2-1b).
+     *
+     * `skipMicTestIfPresent` is the exception: the mic-calibration screen is already inside the
+     * ALL Platform, so its "Skip" is app copy and follows the run's language — the same string
+     * `sessionResume` de-hardcoded in P1-9, which reaches this screen by the other path.
+     */
+    private readonly micSkipPattern: RegExp;
 
     /** Grade selected during guest login (options 1..8). Config-driven; default "2". */
     static readonly DEFAULT_GRADE = process.env.GRADE || '2';
 
-    constructor(page: Page) {
+    constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
+        this.micSkipPattern = copyRe('skip', lang, { exact: true });
     }
 
     // ============================================
@@ -43,8 +60,9 @@ export class DiscoveryLoginPage {
     loginButton = () => this.page.getByRole('button', { name: /Login as Guest/i }).first();
     // Home page → ALL Platform entry (exact text avoids matching "Continue to AML").
     continueToAllButton = () => this.page.getByText('Continue to ALL', { exact: true }).first();
-    // The ALL Platform opens on a microphone-calibration screen with a "Skip".
-    micTestSkip = () => this.page.getByText('Skip', { exact: true }).first();
+    // The ALL Platform opens on a microphone-calibration screen with a "Skip". This one IS app
+    // copy (it is past "Continue to ALL") — see micSkipPattern for where the boundary sits.
+    micTestSkip = () => this.page.getByText(this.micSkipPattern).first();
     errorMessage = () => this.page.locator('[class*="error"], [role="alert"]');
 
     // ============================================

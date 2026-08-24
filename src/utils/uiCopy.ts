@@ -56,7 +56,14 @@ const UI_COPY = {
     // Previously English-only literals in `transitions.ts`. They live here so the advance
     // buttons are translatable like every other screen string; `transitions.ts` still owns
     // the two MATCHING STRATEGIES built from them (see the note in that file).
-    continueLabel: { english: 'Continue' },
+    /**
+     * The Hindi value is the ONE observed non-English string this repo has ever carried: it was
+     * an inline `/^Continue$|जारी रखें/` in `AssessmentPage.continueButton`, i.e. somebody hit
+     * this screen on a Hindi build and wrote down what it said. Preserved here rather than
+     * discarded, because observed copy is exactly what this registry wants and there is no way
+     * to re-derive it without a Hindi run. NOT re-verified against a current build.
+     */
+    continueLabel: { english: 'Continue', hindi: 'जारी रखें' },
     next: { english: 'Next' },
     nextLevel: { english: 'Next Level' },
     letsGo: { english: "Let's Go" },
@@ -119,6 +126,14 @@ const UI_COPY = {
     complete: { english: 'complete' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
     congratulations: { english: 'congrat' },
+    /**
+     * The assessment completion popup's own phrases. These overlap the `successfully` /
+     * `complete` STEMS above but are not duplicates of them: the stems back FoundationPage's
+     * deliberately loose "did the node finish?" heuristic, while these are the specific
+     * wordings the popup renders and are what `expectCompletionPopupVisible` asserts on.
+     */
+    successfullyCompleted: { english: 'successfully completed' },
+    completedAssessment: { english: 'completed assessment' },
 
     // ── Errors ──────────────────────────────────────────────────────────────
     couldntConnect: { english: "Couldn't connect right now" },

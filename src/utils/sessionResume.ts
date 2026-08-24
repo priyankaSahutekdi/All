@@ -51,7 +51,7 @@ export async function resumeParkedAccount(
     // Resolved once up front: both the Skip label and the language switch need it.
     const target = typeof opts.lang === 'string' ? languageByCode(opts.lang) : (opts.lang ?? languageByCode('english'));
 
-    const login = new DiscoveryLoginPage(page);
+    const login = new DiscoveryLoginPage(page, target);
     await login.navigate();
     await login.login(opts.username, opts.password);
 

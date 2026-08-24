@@ -1,4 +1,46 @@
 import { expect, Page } from '@playwright/test';
+import { AppLanguage, languageByCode } from '../../utils/languages';
+import { copy, copyRe } from '../../utils/uiCopy';
+import { TRANSITION_KEYS } from '../../utils/transitions';
+
+/**
+ * Every on-screen string this page object matches, resolved for one language.
+ *
+ * Exported so the English-equivalence check can compare each pattern against the inline literal
+ * it replaced. See `foundationPatterns` in FoundationPage.ts for the same shape and the reasons
+ * behind it (built once, throws on a missing translation rather than falling back to English).
+ */
+export function assessmentPatterns(lang: AppLanguage) {
+    const K = TRANSITION_KEYS;
+    return {
+        /**
+         * The completion popup's celebration message. `successfully completed` /
+         * `completed assessment` are the popup's own phrases, deliberately narrower than
+         * FoundationPage's `successfully` / `complete` stems.
+         */
+        completionPopup: copyRe(['hurray', 'successfullyCompleted', 'completedAssessment'], lang),
+        letsStart: copyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }),
+        /**
+         * Anchored and CASE-SENSITIVE (`flags: ''`), reproducing the inline
+         * `/^Continue$|जारी रखें/` for English exactly.
+         *
+         * That literal also matched the Hindi wording during an ENGLISH run, which this
+         * deliberately no longer does — matching another language's text is the false positive
+         * the LANG axis exists to prevent, and it would make a mis-switched run look healthy.
+         * The Hindi wording is not lost: it is now `continueLabel.hindi` in the registry, so a
+         * Hindi run gets it and an English run does not.
+         */
+        continueExact: copyRe(K.continue, lang, { exact: true, flags: '' }),
+
+        /** Plain labels, for the `getByText(exact)` call sites. */
+        labels: {
+            startAssessment: copy('startAssessment', lang)[0],
+            skipDemo: copy(K.skipDemo, lang)[0],
+            startGame: copy(K.startGame, lang)[0],
+            confirm: copy('confirm', lang)[0],
+        },
+    };
+}
 
 /**
  * Page Object for Assessment Page
@@ -6,9 +48,13 @@ import { expect, Page } from '@playwright/test';
  */
 export class AssessmentPage {
     private page: Page;
+    /** Every on-screen string this page matches, resolved for the run's language. */
+    private readonly copy: ReturnType<typeof assessmentPatterns>;
 
-    constructor(page: Page) {
+    /** `lang` defaults to English so any call site not yet carrying the LANG axis still works. */
+    constructor(page: Page, lang: AppLanguage = languageByCode('english')) {
         this.page = page;
+        this.copy = assessmentPatterns(lang);
     }
 
     // ============================================
@@ -22,13 +68,14 @@ export class AssessmentPage {
     // stable hook at all, so it is driven by viewport-centre coordinates (see
     // DiscoveryModule.recordSentence) against the fixed 1280x720 viewport.
 
-    // Text-labelled buttons (stable across builds)
-    startAssessmentButton = () => this.page.getByText('Start Assessment', { exact: true }).first();
-    skipDemoButton = () => this.page.getByText('Skip Demo', { exact: true }).first();
-    startGameButton = () => this.page.getByText('Start Game', { exact: true }).first();
-    confirmButton = () => this.page.getByText('Confirm', { exact: true }).first();
+    // Text-labelled buttons (stable across builds). The labels come from the uiCopy registry,
+    // so they follow the run's language instead of being English-only.
+    startAssessmentButton = () => this.page.getByText(this.copy.labels.startAssessment, { exact: true }).first();
+    skipDemoButton = () => this.page.getByText(this.copy.labels.skipDemo, { exact: true }).first();
+    startGameButton = () => this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
+    confirmButton = () => this.page.getByText(this.copy.labels.confirm, { exact: true }).first();
     // "Let's Start" may use a straight OR curly apostrophe (or none) — match any char.
-    letsStartButton = () => this.page.getByText(/Let.?s\s*Start/i).first();
+    letsStartButton = () => this.page.getByText(this.copy.letsStart).first();
 
     // ---- Recording controls ----
     // Post-record controls keep stable styled-classes across builds (#550..#582):
@@ -38,14 +85,14 @@ export class AssessmentPage {
     nextButton = () => this.page.locator('div.css-4g6ai3, div.css-1m9gxh8 > div').first();
 
     // Completion popup "Continue" — real text button when present.
-    continueButton = () => this.page.getByText(/^Continue$|जारी रखें/).first();
+    continueButton = () => this.page.getByText(this.copy.continueExact).first();
 
     // Content — the sentence/word to read renders as a NON-EMPTY level-4 heading
     // (there is also an empty h4 on the page, so we must filter for text).
     sentenceText = () => this.page.getByRole('heading', { level: 4 })
         .filter({ hasText: /\S/ }).first();
     // Completion popup shows a "Hurray" celebration message.
-    completionPopup = () => this.page.getByText(/Hurray|successfully completed|completed assessment/i).first();
+    completionPopup = () => this.page.getByText(this.copy.completionPopup).first();
 
     // ============================================
     // ACTIONS
