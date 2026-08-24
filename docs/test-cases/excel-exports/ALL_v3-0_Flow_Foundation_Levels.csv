@@ -1,0 +1,38 @@
+Level,Task,Levels,Pass Criteria,Data to Learner Profile,Skill Covered,Scope/Sequence,English Content,Indic Content,Mechanics,Min Interactions,Max Interactions,Automation Status,Notes
+F0,Auditory Question 1,No levels,Auditory Accuracy 4/5,Lesson Tracking,Perceptual Skills,Showcase Mechanic,5 questions,5 questions,Auditory Test,5,5,⏳ Pending,Both A and V score should be > 4/5
+F0,Video Question 1,No levels,Video Accuracy 4/5,Lesson Tracking,Perceptual Skills,Showcase Mechanic,5 questions,5 questions,Video Test,5,5,⏳ Pending,Both A and V score should be > 4/5
+F1,Learn 1 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 1,"E, T, A, O","త, బ, ల, క, జ",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 1 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 1,"E, T, A, O","త, బ, ల, క, జ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 2 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 1-2,"I, N, S, R","ర, ఆ, ట, ఉ, గ",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 2 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 1-2,"I, N, S, R","ర, ఆ, ట, ఉ, గ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 3 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 1-3,"H, L, D, C","శ, అ, న, ప, స",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 3 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 1-3,"H, L, D, C","శ, అ, న, ప, స",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Apply 1 - Letter Hunt,3 Levels,Score 10 without losing 3 lives,Learner Profile,Letter Recognition,Alphabet set 1-3,12-18 letters,12-18 letters,Letter Hunt,3,36,⏳ Pending,Randomized content
+F1,Learn 4 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 4,"U, M, F, P","వ, ఊ, డ, ద, ఈ",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 4 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 4,"U, M, F, P","వ, ఊ, డ, ద, ఈ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 5 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 4-5,"G, W, Y, B","మ, చ, ఒ, ఓ, ఔ",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 5 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 4-5,"G, W, Y, B","మ, చ, ఒ, ఓ, ఔ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 6 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 4-6,"V, K, X, J","య, ఇ, ఎ, ఏ, ఐ",Letter Train,8,8,⏳ Pending,4-6 letters per set
+F1,Practice 6 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 4-6,"V, K, X, J","య, ఇ, ఎ, ఏ, ఐ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Apply 2 - Letter Hunt,3 Levels,Score 10 without losing 3 lives,Learner Profile,Letter Recognition,Alphabet set 4-6,12-18 letters,12-18 letters,Letter Hunt,3,36,⏳ Pending,Randomized content
+F1,Learn 7 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 7,"Q, Z, E, T","ణ, ళ, హ, ఖ, ఛ",Letter Train,8,8,⏳ Pending,4-5 letters per set
+F1,Practice 7 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 7,"Q, Z, E, T","ణ, ళ, హ, ఖ, ఛ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 8 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 7-8,"A, O, I, N","ఠ, ఢ, ఘ, ఝ, ఋ",Letter Train,8,8,⏳ Pending,4-5 letters per set
+F1,Practice 8 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 7-8,"A, O, I, N","ఠ, ఢ, ఘ, ఝ, ఋ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Learn 9 - Letter Train,No levels,NA,Lesson Tracking,Letter Recognition,Alphabet set 7-9,"S, R, H, L","ష, థ, ధ, ఫ, భ",Letter Train,8,8,⏳ Pending,4-5 letters per set
+F1,Practice 9 - Letter Hunt,1 level,Get every letter right 2 times,Lesson Tracking,Letter Recognition,Alphabet set 7-9,"S, R, H, L","ష, థ, ధ, ఫ, భ",Letter Hunt,12,12,⏳ Pending,10 content repeat
+F1,Apply 3 - Letter Hunt,3 Levels,Score 10 without losing 3 lives,Learner Profile,Letter Recognition,Alphabet set 7-9,12-15 letters,12-15 letters,Letter Hunt,3,36,⏳ Pending,Pass moves to F2
+F2,Learn 1 - Syllable Clap,No levels,NA,Lesson Tracking,Phonological Awareness,Syllable set 1,"me, be, he, the, her, ear","గది, చేను, చీర, గెల, సౌధం",Letter Train,12,12,⏳ Pending,6 syllables per set
+F2,Practice 1 - Letter Hunt,1 level,Get every syllable right 2 times,Lesson Tracking,Phonological Awareness,Syllable set 1,"me, be, he, the, her, ear","ది, చే, చీ, గె, సౌ",Letter Hunt,10,10,⏳ Pending,10 content
+F2,Learn 2 - Syllable Clap,No levels,NA,Lesson Tracking,Phonological Awareness,Syllable set 1-2,"Go, Do, So, No, to, not","గృహం, జాతర, గీరు, జైలు, కోకిల",Letter Train,12,12,⏳ Pending,6 syllables per set
+F2,Practice 2 - Letter Hunt,1 level,Get every syllable right 2 times,Lesson Tracking,Phonological Awareness,Syllable set 1-2,"Go, Do, So, No, to, not","గృ, జా, గీ, జై, కో",Letter Hunt,10,10,⏳ Pending,10 content
+F2,Learn 3 - Syllable Clap,No levels,NA,Lesson Tracking,Phonological Awareness,Syllable set 1-3,"or, of, our, on, one, Ox","నౌక, నీకు, పోరు, మెడ, టోపీ",Letter Train,12,12,⏳ Pending,6 syllables per set
+F2,Practice 3 - Letter Hunt,1 level,Get every syllable right 2 times,Lesson Tracking,Phonological Awareness,Syllable set 1-3,"or, of, our, on, one, Ox","నౌ, నీ, పో, మె, పీ",Letter Hunt,10,10,⏳ Pending,10 content
+F2,Apply 1 - Letter Hunt,3 Levels,Score 10 without losing 3 lives,Learner Profile,Phonological Awareness,Syllable set 1-3,18 syllables,18 syllables,Letter Hunt,3,36,⏳ Pending,Randomized content
+F3,Practice 1 - Letter Speed,No levels,80% accuracy,Lesson Tracking,Letter Recognition,Alphabet sets,10 questions,10 questions,Letter Launcher,20,20,⏳ Pending,Speed check
+F3,Practice 2 - Letter Sequence Recall,1 level,80% accuracy,Lesson Tracking,Letter Recognition,Alphabet sets,10 questions,10 questions,Memory Challenge,20,20,⏳ Pending,Sequence recall
+F3,Apply 1 - Letter Speed,3 Levels,80% accuracy + 80% fuel under 90s,Learner Profile,Letter Recognition,Alphabet sets,50 questions,50 questions,Letter Launcher,20,60,⏳ Pending,Pass moves to Syllable Speed
+F3,Practice 6 - Syllable Speed,No levels,80% accuracy,Lesson Tracking,Phonological Awareness,Syllable sets,10 questions,10 questions,Letter Launcher,20,20,⏳ Pending,Speed check
+F3,Practice 7 - Syllable Speed,1 level,80% accuracy,Lesson Tracking,Phonological Awareness,Syllable sets,10 questions,10 questions,Letter Launcher,20,20,⏳ Pending,Speed check
+F3,Apply 2 - Syllable Speed,3 Levels,80% accuracy + 80% fuel under 90s,Learner Profile,Phonological Awareness,Syllable sets,50 questions,50 questions,Letter Launcher,20,60,⏳ Pending,Pass moves to Read Aloud
+F3,Read Aloud,No levels,Just speak something,Audio Capture,Speaking,Simple root words,10 words,10 words,Read Aloud,20,20,⏳ Pending,This is a / That is a format

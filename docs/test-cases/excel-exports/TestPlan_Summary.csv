@@ -1,0 +1,118 @@
+Section,Details,Status,Notes
+Project Name,EkStep Practice Platform (ALL),Active,Educational web application
+Application Type,Web-based Educational Practice Platform,Active,Literacy improvement focus
+Automation Tool,Playwright,Implemented,Version 1.60.0
+Programming Language,TypeScript,Implemented,Type-safe automation
+Framework Pattern,Page Object Model (POM),Implemented,Modular and scalable
+Test Environment,UAT / Staging,Active,https://all-uat.theall.ai
+Current Build,#489 · b91140e,Active,Latest UAT build
+Methodology,Agile / Scrum,Active,Continuous deployment
+Defect Tracking Tool,Jira,Active,Issue tracking
+
+Objective,Description,Status,Priority
+Validate critical workflows,End-to-end automation,In Progress,High
+Detect UI inconsistencies,Rapid user interaction testing,Pending,Medium
+Audio lifecycle stability,Navigation and language changes,Pending,High
+Reduce manual regression,Frequent deployment support,In Progress,High
+Rapid smoke validation,After each UAT deployment,Pending,High
+Scalable framework,Future feature expansion,Completed,High
+
+Scope - In Scope,Module,Status,Coverage
+Authentication & Onboarding,Discovery Flow,✅ Completed,100%
+Language Selection & Settings,Discovery Flow,✅ Completed,100%
+Speed Practice Module,Foundation/Mastery,⏳ Pending,0%
+Progress Dashboard,All Levels,⏳ Pending,0%
+Regression Testing,Discovery,✅ Completed,100%
+Audio Lifecycle Testing,Discovery,✅ Completed,100%
+
+Scope - Out of Scope,Item,Reason,Alternative
+Audio pronunciation quality,Complex analysis required,Manual testing recommended
+Load and performance testing,Separate tool needed,Use JMeter/K6
+Security and penetration testing,Specialized expertise required,Security team
+Network throttling simulation,Not critical for functional tests,Manual testing if needed
+CAPTCHA validation,Not applicable,N/A
+Third-party SSO integrations,Not in current scope,Future phase
+Accessibility compliance,Requires specialized tools,WCAG manual testing
+Cross-browser (Phase 1),Chrome only initially,Phase 2 expansion
+
+Test Strategy,Approach,Status,Notes
+Automation Framework,Playwright with TypeScript,✅ Implemented,Production ready
+Page Object Model,POM architecture,✅ Implemented,Clean separation
+Modular utilities,Reusable helpers,✅ Implemented,Logger/DataGenerator/etc
+Environment configs,.env based,✅ Implemented,Multi-environment support
+API-assisted setup,State management,⏳ Pending,Future enhancement
+Parallel execution,3 workers,✅ Implemented,Configurable
+Tag-based execution,@Smoke @Regression @P0,✅ Implemented,Flexible filtering
+Retry mechanisms,0 local / 2 CI,✅ Implemented,Configurable
+
+Test Environment,Configuration,Value,Notes
+Environment URL,UAT,https://all-uat.theall.ai,Primary test environment
+VPN Required,No,N/A,Direct access
+IP Restrictions,None,N/A,Open access
+HTTPS Access,Enabled,Yes,Secure connection
+Shared Test Accounts,Yes,Dynamic generation,testuser_<timestamp>
+Audio Assets,Preloaded,Yes,Available in UAT
+Vocabulary Data,Preloaded,Yes,Available in UAT
+
+Test Data Strategy,Approach,Status,Implementation
+Static lexical data,JSON files,✅ Implemented,src/testdata/
+Shared account strategy,Relative assertions,✅ Implemented,Dynamic usernames
+Global teardown,Cleanup process,⏳ Pending,Future enhancement
+State normalization,API/scripts,⏳ Pending,Future enhancement
+Dynamic generation,Username/password,✅ Implemented,DiscoveryHelper utility
+
+CI/CD Integration,Trigger,Status,Platform
+Smoke after deployment,Automated,⏳ Pending,GitHub Actions ready
+Nightly regression,Scheduled,⏳ Pending,Cron job setup needed
+Manual QA execution,On-demand,✅ Available,npm commands
+GitHub Actions,Primary,✅ Ready,Workflow files created
+Jenkins,Optional,✅ Ready,Jenkinsfile available
+Azure DevOps,Optional,⏳ Pending,Future support
+
+Reporting,Type,Status,Location
+HTML Reports,Enabled,✅ Implemented,playwright-report/
+Allure Reports,Planned,⏳ Pending,Future enhancement
+Screenshots,On failure,✅ Implemented,test-results/
+Videos,On failure,✅ Implemented,test-results/
+Trace Files,On failure,✅ Implemented,test-results/
+Slack Notifications,Planned,⏳ Pending,CI/CD integration
+Email Notifications,Planned,⏳ Pending,CI/CD integration
+
+Browser Coverage,Browser,Phase,Status
+Google Chrome,Phase 1,✅ Implemented,Primary browser
+Firefox,Phase 2,⏳ Pending,Future support
+Edge,Phase 2,⏳ Pending,Future support
+Safari,Phase 2,⏳ Pending,Future support
+Mobile Chrome,Phase 1,✅ Implemented,Pixel 5 viewport
+Mobile Safari,Phase 2,⏳ Pending,Future support
+
+Defect Management,Classification,Priority,Description
+Blocker,P0,Critical,Blocks testing completely
+Critical,P1,High,Major functionality broken
+Major,P2,Medium,Important feature affected
+Minor,P3,Low,Cosmetic or minor issue
+
+MVP Automation Scope,Priority,Status,Coverage
+User Authentication,1,✅ Completed,100%
+Onboarding Demo Validation,2,✅ Completed,100%
+Audio Teardown Verification,3,✅ Completed,100%
+Speed Practice Module,4,⏳ Pending,0%
+Option Freeze Validation,5,⏳ Pending,0%
+Progress Increment Verification,6,⏳ Pending,0%
+Score Validation,7,⏳ Pending,0%
+Target Coverage,60% critical workflows,In Progress,Currently ~10%
+
+Risks & Mitigation,Risk,Mitigation,Status
+Shared account conflicts,Relative assertions,✅ Implemented,Dynamic usernames
+Audio timing instability,Retry mechanisms,✅ Implemented,Configurable retries
+Dynamic UI delays,Explicit waits,✅ Implemented,Smart waiting
+Frequent deployments,Stable smoke suite,✅ Implemented,Discovery tests
+Missing reset APIs,Controlled test states,⏳ Pending,Workaround in place
+
+Implementation Roadmap,Phase,Status,Timeline
+Phase 1 - Framework setup,Completed,✅ Done,Week 1
+Phase 2 - Smoke suite,Completed,✅ Done,Week 1
+Phase 3 - Full regression,In Progress,⏳ Ongoing,Week 2-4
+Phase 4 - Cross-browser,Planned,⏳ Pending,Week 5-6
+Phase 5 - Advanced reporting,Planned,⏳ Pending,Week 7-8
+Phase 6 - Stability optimization,Planned,⏳ Pending,Week 9-10

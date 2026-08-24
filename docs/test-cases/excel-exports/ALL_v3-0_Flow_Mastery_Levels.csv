@@ -1,0 +1,83 @@
+Level,Task,Pass Criteria,Data to Learner Profile,Description,Skill Covered,English Content,Indic Content,Mechanics,Automation Status,Notes
+M1,L1 - Syllable Clapping,10 words to segment,Lesson Tracking,Syllable Clapping,Blending and Segmentation,10 words,10 words,Word Hunt (Ping img and text),⏳ Pending,Simple words 1-2 syllables
+M1,L2 - Word Hunt,10 words to segment,Lesson Tracking,Syllable Clapping,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Sound matching
+M1,P1 - Sound Hunt,10 words to segment,Lesson Tracking,Word Speaking,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Picture-based
+M1,P2 - Word Speaking,10 words to segment,Lesson Tracking,Word Speaking,Blending and Segmentation,10 words,10 words,Word Speaking (Plain text),⏳ Pending,Plain text reading
+M1,S1 - Word Hunt,Accuracy > 80%,Learner Profile,Listen and choose right word,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Assessment
+M1,S1 - Sound Hunt,Accuracy > 80%,Learner Profile,Read and choose right sound,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Assessment
+M1,L3 - Syllable Clapping,10 words to segment,Lesson Tracking,Syllable Clapping,Blending and Segmentation,10 words,10 words,Word Hunt (Ping img and text),⏳ Pending,Second set
+M1,L4 - Word Hunt,10 words to segment,Lesson Tracking,Syllable Clapping,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Second set
+M1,P3 - Sound Hunt,10 words to segment,Lesson Tracking,Word Speaking,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Second set
+M1,P4 - Word Speaking,10 words to segment,Lesson Tracking,Word Speaking,Blending and Segmentation,10 words,10 words,Word Speaking (Plain text),⏳ Pending,Second set
+M1,S2 - Word Hunt,Accuracy > 80%,Learner Profile,Listen and choose right word,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Pass moves to M2
+M1,S2 - Sound Hunt,Accuracy > 80%,Learner Profile,Read and choose right sound,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Pass moves to M2
+M2,L1 - Bingo Cards,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Bingo Cards,⏳ Pending,Vocabulary building
+M2,L2 - Bingo Cards,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Bingo Cards,⏳ Pending,Vocabulary building
+M2,P1 - Word Hunt,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Sound Hunt (Picture Match),⏳ Pending,Practice
+M2,P2 - Sound Hunt,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Word Speaking (Plain text),⏳ Pending,Practice
+M2,S1 - Word Hunt,Accuracy > 80%,Learner Profile,Listen and choose right word,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Assessment
+M2,S1 - Sound Hunt,Accuracy > 80%,Learner Profile,Read and choose right sound,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Assessment
+M2,L3 - Bingo Cards,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Bingo Cards,⏳ Pending,Second set
+M2,L4 - Bingo Cards,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Bingo Cards,⏳ Pending,Second set
+M2,P3 - Word Hunt,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Sound Hunt (Picture Match),⏳ Pending,Second set
+M2,P4 - Sound Hunt,NA,Lesson Tracking,Lesson Tracking,Word Vocabulary,10 words,10 words,Word Speaking (Plain text),⏳ Pending,Second set
+M2,S2 - Word Hunt,Accuracy > 80%,Learner Profile,Listen and choose right word,Blending and Segmentation,10 words,10 words,Word Hunt (Sound Match),⏳ Pending,Pass moves to M3
+M2,S2 - Sound Hunt,Accuracy > 80%,Learner Profile,Read and choose right sound,Blending and Segmentation,10 words,10 words,Sound Hunt (Picture words),⏳ Pending,Pass moves to M3
+M3,L1 - Phrase Reading,10 phrases,Lesson Tracking,Phrase reading with image,Blending/Segmentation/Reading,10 phrases,10 phrases,Phrase Reading,⏳ Pending,Image + text + voice
+M3,L2 - Correct Image,10 phrases,Lesson Tracking,Choose correct image,Blending/Segmentation/Reading,10 phrases,10 phrases,Repeat Phrase,⏳ Pending,Text + 3 images
+M3,P1 - Repeat Phrase,10 phrases,Lesson Tracking,Repeat phrase,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Plain text
+M3,P2 - Phrase Reading,10 phrases,Lesson Tracking,Read phrase,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Plain text
+M3,S1 - Phrase Reading,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,ASR task,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Assessment
+M3,L3 - Repeat Phrase,10 phrases,Lesson Tracking,Repeat phrase,Blending/Segmentation/Reading,10 phrases,10 phrases,Phrase Reading,⏳ Pending,Second set
+M3,L4 - Correct Image,10 phrases,Lesson Tracking,Choose correct image,Blending/Segmentation/Reading,10 phrases,10 phrases,Repeat Phrase,⏳ Pending,Second set
+M3,P3 - Phrase Reading,10 phrases,Lesson Tracking,Read phrase,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Second set
+M3,P4 - Phrase Reading,10 phrases,Lesson Tracking,Read phrase,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Second set
+M3,S2 - Phrase Reading,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,ASR task,Blending/Segmentation/Reading,10 phrases,10 phrases,Word Speaking,⏳ Pending,Pass moves to M4 + TOWRE
+M4,P1 - Fill in the Blank,NA,Lesson Tracker,Fill blank by selecting word,Reading,10 sentences,10 sentences,Speed Practice (counter),⏳ Pending,Simple sentences
+M4,P2 - Form a Sentence,NA,Lesson Tracker,Form sentence from jumbled words,Reading,10 sentences,10 sentences,Speed Practice (scroll),⏳ Pending,With audio
+M4,P3 - Read the Image,NA,Lesson Tracker,Choose correct option by image,Reading,10 sentences,10 sentences,Speed Practice (Did you see),⏳ Pending,Image-based
+M4,P4 - Read Aloud,NA,Lesson Tracker,Listen and speak back,Reading,10 sentences,10 sentences,Speed Practice (counter),⏳ Pending,Simple sentence
+M4,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,Choose correct option,Reading,5 sentences,5 sentences,Read the Image,⏳ Pending,Pass to Read Aloud
+M4,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,Read aloud,Reading,10 sentences,10 sentences,Read Aloud,⏳ Pending,Pass moves to M5
+M4,Apply - Recall Flash,NA,NA,Word wall,Reading,NA,NA,Word Wall,⏳ Pending,Vocabulary recall
+M5,P1 - Fill in the Blank,NA,Lesson Tracker,Fill blank by selecting word,Reading,10 sentences,10 sentences,Paced Reading,⏳ Pending,Speed reading
+M5,P2 - Form a Sentence,NA,Lesson Tracker,Form sentence from jumbled words,Reading,10 sentences,10 sentences,Ticker,⏳ Pending,Running text
+M5,P3 - Read the Image,NA,Lesson Tracker,Choose correct option by image,Reading,10 sentences,10 sentences,Word Recall,⏳ Pending,Read and select
+M5,P4 - Read Aloud,NA,Lesson Tracker,Listen and speak back,Reading,10 sentences,10 sentences,Read Aloud Fluently,⏳ Pending,Timed speaking
+M5,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,Choose correct option,Reading,5 sentences,5 sentences,Sentence Builder,⏳ Pending,Picture-based
+M5,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good,Learner Profile,Read aloud,Reading,10 sentences,10 sentences,Read Aloud,⏳ Pending,Pass moves to M6
+M5,Apply - Recall Flash,NA,NA,Word wall,Reading,NA,NA,Word Wall,⏳ Pending,Vocabulary recall
+M6,P1 - Read Aloud Ticker,NA,Lesson Tracker,Complex sentence,Reading,10 sentences,10 sentences,Paced Reading,⏳ Pending,Speed reading
+M6,P2 - Read the Image,NA,Lesson Tracker,Form sentence from jumbled,Reading,10 sentences,10 sentences,Ticker,⏳ Pending,Running text
+M6,P3 - Read Aloud Flash,NA,Lesson Tracker,Higher complexity,Reading,10 sentences,10 sentences,Word Recall,⏳ Pending,Read and select
+M6,P4 - Read Aloud,NA,Lesson Tracker,Higher complexity,Reading,10 sentences,10 sentences,Read Aloud Fluently,⏳ Pending,Timed speaking
+M6,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / cWPM > 45,Learner Profile,Choose correct option,Reading,5 sentences,5 sentences,Read and Speak,⏳ Pending,Assessment
+M6,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / cWPM > 45,Learner Profile,Read aloud,Reading,10 sentences,10 sentences,Read Aloud,⏳ Pending,Pass moves to M7
+M6,Apply - Recall Flash,Only if pass S1,NA,Word wall,Reading,NA,NA,Word Wall,⏳ Pending,Vocabulary recall
+M6,TOWRE,NA,NA,TOWRE assessment,Reading,NA,NA,TOWRE,⏳ Pending,Baseline/Midline/Endline
+M7,P1 - Read Aloud,NA,Lesson Tracker,Simple paragraph,Reading,10 paragraphs,10 paragraphs,Ticker,⏳ Pending,Running text
+M7,P2 - Read the Image,NA,Lesson Tracker,Choose correct option,Reading,10 paragraphs,10 paragraphs,Ticker,⏳ Pending,Paragraph content
+M7,P3 - Read Aloud,NA,Lesson Tracker,Simple paragraph,Reading,10 paragraphs,10 paragraphs,Word Recall,⏳ Pending,Read and select
+M7,P4 - Read Aloud,NA,Lesson Tracker,Simple paragraph,Reading,10 paragraphs,10 paragraphs,Read Aloud Fluently,⏳ Pending,Timed speaking
+M7,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Choose correct option,Reading,5 paragraphs,5 paragraphs,Read and Speak,⏳ Pending,Assessment
+M7,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Simple paragraph,Reading,10 paragraphs,10 paragraphs,Read Aloud,⏳ Pending,Pass moves to M8
+M7,Apply - Fluency P4,NA,NA,Multiple contents in 30s,Reading,NA,NA,Fluency Practice,⏳ Pending,Speed practice
+M7,Apply - Textbook Reading,NA,NA,Textbook image reading,Reading,NA,NA,Textbook Reading,⏳ Pending,Real book content
+M8,P1 - Read Aloud,NA,Lesson Tracker,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Ticker,⏳ Pending,Running text
+M8,P2 - Read Aloud,NA,Lesson Tracker,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Ticker,⏳ Pending,Running text
+M8,P3 - Read the Image,NA,Lesson Tracker,Choose correct option,Reading,10 paragraphs,10 paragraphs,Word Recall,⏳ Pending,Read and select
+M8,P4 - Read Aloud,NA,Lesson Tracker,Choose correct option,Reading,10 paragraphs,10 paragraphs,Read Aloud Fluently,⏳ Pending,Timed speaking
+M8,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Choose correct option,Reading,5 paragraphs,5 paragraphs,Read and Speak,⏳ Pending,Assessment
+M8,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Read Aloud,⏳ Pending,Pass moves to M9
+M8,Apply - Fluency P4,NA,NA,Multiple contents in 30s,Reading,NA,NA,Fluency Practice,⏳ Pending,Speed practice
+M8,Apply - Textbook Reading,Not evaluated,NA,Textbook image reading,Reading,NA,NA,Textbook Reading,⏳ Pending,Apply task only
+M9,P1 - Read Aloud,NA,Lesson Tracker,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Read from Book,⏳ Pending,Book reading
+M9,P2 - Read Aloud,NA,Lesson Tracker,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Read from Book,⏳ Pending,Book reading
+M9,P3 - Read the Image,NA,Lesson Tracker,Choose correct option,Reading,10 paragraphs,10 paragraphs,Word Recall,⏳ Pending,Read and select
+M9,P4 - Read Aloud,NA,Lesson Tracker,Choose correct option,Reading,10 paragraphs,10 paragraphs,Read Aloud Fluently,⏳ Pending,Timed speaking
+M9,S1 - Read the Image,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Choose correct option,Reading,5 paragraphs,5 paragraphs,Read and Speak,⏳ Pending,Assessment
+M9,S1 - Read Aloud,Accuracy 80% / Familiarity 70% / Fluency Fair-Good / Prosody Natural-Flat / cWPM > 45,Learner Profile,Moderate paragraph,Reading,10 paragraphs,10 paragraphs,Read Aloud,⏳ Pending,Final assessment
+M9,Apply - Fluency P4,NA,NA,Multiple contents in 30s,Reading,NA,NA,Fluency Practice,⏳ Pending,Speed practice
+M9,Apply - Textbook Reading,Not evaluated,NA,Textbook image reading,Reading,NA,NA,Textbook Reading,⏳ Pending,Apply task only
+M9,Apply - Word Wall,NA,NA,Vocabulary recall,Reading,NA,NA,Word Wall,⏳ Pending,Vocabulary
+M9,Apply - TOWRE,NA,NA,TOWRE assessment,Reading,NA,NA,TOWRE,⏳ Pending,Endline assessment
