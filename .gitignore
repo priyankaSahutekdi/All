@@ -15,7 +15,11 @@ playwright/.cache/
 *.swp
 *.swo
 
+# Claude Code
+.claude/
+
 # Environment
+.env
 .env.local
 .env.*.local
 
@@ -23,10 +27,14 @@ playwright/.cache/
 .DS_Store
 Thumbs.db
 
+# Lock files (LibreOffice, Excel)
+.~lock.*
+*.lock
+
 # Logs
 *.log
 npm-debug.log*
 
 # Coverage
 coverage/
-
+tta-report/
