@@ -124,11 +124,15 @@ function checkPlacementRules(filePath, issues) {
     }
 }
 
+function isExcluded(filePath, rule) {
+    return (rule.excludeFiles || []).some((excluded) => toPosix(excluded) === toPosix(filePath));
+}
+
 function checkFolderNamingRules(filePath, issues) {
     const fileName = path.basename(filePath);
 
     for (const rule of config.folderNamingRules || []) {
-        if (!isInsideFolder(filePath, rule.folder)) {
+        if (!isInsideFolder(filePath, rule.folder) || isExcluded(filePath, rule)) {
             continue;
         }
 
@@ -146,7 +150,7 @@ function checkFolderNamingRules(filePath, issues) {
 }
 
 function checkContentRule(filePath, content, rule, severity, issues) {
-    if (!isInsideFolder(filePath, rule.folder)) {
+    if (!isInsideFolder(filePath, rule.folder) || isExcluded(filePath, rule)) {
         return;
     }
 
