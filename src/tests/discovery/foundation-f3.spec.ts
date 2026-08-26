@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures/appTest';
-import { FoundationPage } from '../../pages/foundation/FoundationPage';
+import { FoundationPage } from '../../pages/foundation';
 import { resumeParkedAccount } from '../../utils/sessionResume';
 
 /**

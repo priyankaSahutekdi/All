@@ -10,7 +10,7 @@ import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../
 import {
     TRANSITION_KEYS, foundationTransitionPriority, transitionRe,
 } from '../../utils/transitions';
-import { copy, copyAlt, copyRe, copyWordsAlt, lazyProp, tryCopyAlt, tryCopyRe, CopyKey } from '../../utils/UiCopy';
+import { copy, copyAlt, copyRe, lazyProp, tryCopyAlt, tryCopyRe, CopyKey } from '../../utils/UiCopy';
 import { letsStartButtonClosure } from '../../utils/GeometryLocator';
 
 const K = TRANSITION_KEYS;
@@ -19,6 +19,8 @@ const K = TRANSITION_KEYS;
 export interface FoundationCopy {
     resultMessage: RegExp;
     startF1: RegExp;
+    startF2: RegExp;
+    startF3: RegExp;
     startAnyFoundation: RegExp;
     /** `null` in a language whose F1-entry button has no text at all to observe (Hindi, confirmed H11: icon-only SVG). */
     letsStart: RegExp | null;
@@ -116,6 +118,10 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
     lazyProp(p, 'resultMessage', () => copyRe(['learningJourney', 'languageSkills', 'hurray'], lang));
     /** The F1 landing entry button on the learning-journey map. */
     lazyProp(p, 'startF1', () => new RegExp(startFoundation('F1'), 'i'));
+    /** The F2 landing entry button — used to tell "at F2 entry" apart from F1/F3's. */
+    lazyProp(p, 'startF2', () => new RegExp(startFoundation('F2'), 'i'));
+    /** The F3 landing entry button — used to detect "F2 done, now at F3 entry". */
+    lazyProp(p, 'startF3', () => new RegExp(startFoundation('F3'), 'i'));
     /** Any "Start F#" journey-map entry (opens the next Foundation level). */
     lazyProp(p, 'startAnyFoundation', () => new RegExp(startFoundation('F\\d+'), 'i'));
     lazyProp(p, 'letsStart', () => tryCopyRe('letsStart', lang, { apostrophe: 'any', space: 'flexible' }));
@@ -144,8 +150,20 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
         'iu',
     ));
 
-    /** F3 is done — the app has moved to the next-phase journey map. */
-    lazyProp(p, 'pastF3', () => copyRe(['wordsPerMinute', 'wordsLearnt', 'startLevel'], lang));
+    /**
+     * F3 is done — the app has moved to the next-phase journey map. Independent OR'd signals
+     * (`optFrag`/`orNone`, like `pastApplyMarkers` below) rather than a rigid `copyRe`, which
+     * required ALL THREE to resolve — a real problem for this specific marker set, since it can
+     * only ever be observed by actually finishing F3 once, and two of the three (`wordsLearnt`,
+     * `startLevel`) were observed live (EL-24) before the third (`wordsPerMinute`) ever was. A
+     * language with 2 of 3 signals should detect "past F3" from those two, not be blocked
+     * waiting on a chicken-and-egg third observation.
+     */
+    lazyProp(p, 'pastF3', () => new RegExp(orNone([
+        ...optFrag('wordsPerMinute'),
+        ...optFrag('wordsLearnt'),
+        ...optFrag('startLevel'),
+    ]), 'i'));
 
     /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
     lazyProp(p, 'feedbackShort', () => copyRe(['correct', 'great'], lang));
@@ -175,11 +193,23 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
      * words are derived from the game titles rather than re-listed, so they cannot drift
      * away from them.
      */
-    lazyProp(p, 'launcherChrome', () => new RegExp(
-        `^(?:${ANY_LANGUAGE_LABEL.source}|`
-        + `${copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading'], lang)})$`,
-        'iu',
-    ));
+    // `copyWordsAlt` requires EVERY listed key to resolve (same as `copyAlt`), but this is a
+    // purely defensive exclusion list (chrome headings to skip when scraping the Letter
+    // Launcher's shown-letter/word prompt) — a language missing one of these words should just
+    // exclude fewer headings, not block the whole Letter Launcher solver on words that don't even
+    // appear on its screen (confirmed live: Letter Launcher never shows "Memory Challenge" text).
+    // Built the same way `copyWords`/`copyWordsAlt` do (split each resolved key into words,
+    // dedupe, escape), just per-key tolerant of a throw instead of requiring all five up front.
+    lazyProp(p, 'launcherChrome', () => {
+        const words = ['letterLauncher', 'memoryChallenge', 'fuelLabel', 'progressLabel', 'loading']
+            .flatMap((k) => { try { return copy(k as CopyKey, lang); } catch { return []; } })
+            .flatMap((s) => s.split(/\s+/)).filter(Boolean);
+        const escaped = [...new Set(words)].map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        return new RegExp(
+            `^(?:${ANY_LANGUAGE_LABEL.source}${escaped.length ? `|${escaped.join('|')}` : ''})$`,
+            'iu',
+        );
+    });
 
     /**
      * Loose "we advanced past the Apply" markers. These are heuristics OR'd with the
@@ -370,9 +400,22 @@ export class FoundationPage {
         const target = typeof lang === 'string' ? languageByCode(lang) : lang;
         const targetRe = labelRe(target);
 
-        // 1. Confirm the "Choose your help language" modal if it is showing.
-        if (await this.page.getByText(this.copy.helpLanguageModal).isVisible({ timeout: 4000 }).catch(() => false)) {
-            const helpConfirm = this.page.getByText(this.copy.confirmExact).first();
+        // 1. Confirm the "Choose your help language" modal if it is showing. Like Discovery
+        //    TC-002's identical popup (see `DiscoveryFlow.ts`'s `chooseHelpLanguage`/`confirm`
+        //    comment, H-1/D-10), this modal renders in FIXED ENGLISH regardless of the run's
+        //    target language — the app has not been told the target yet at this point. Live
+        //    evidence THIS session (a real screenshot, resuming a Hindi account): the modal read
+        //    "Choose your help language" / "Confirm" in English, with "Telugu" pre-selected —
+        //    using `lang` (Hindi) here previously threw (`this.copy.helpLanguageModal` had no
+        //    Hindi value, since every prior caller only ever switched TO English) and an earlier,
+        //    now-corrected fix just swallowed that throw, which would have left the modal
+        //    unconfirmed and sitting open on top of the real screen instead of actually
+        //    confirming it. Hardcoding English here — matching the proven `DiscoveryFlow.ts`
+        //    pattern — is the real fix, not a defensive catch.
+        const helpModalPattern = copyRe('chooseHelpLanguage', languageByCode('english'));
+        const helpConfirmPattern = copyRe('confirm', languageByCode('english'), { exact: true });
+        if (await this.page.getByText(helpModalPattern).isVisible({ timeout: 4000 }).catch(() => false)) {
+            const helpConfirm = this.page.getByText(helpConfirmPattern).first();
             if (await helpConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
                 await helpConfirm.click({ force: true }).catch(() => {});
                 await this.page.waitForTimeout(2500);
@@ -934,9 +977,17 @@ export class FoundationPage {
         for (let adv = 0; adv < 4; adv++) {
             const stillFeedback = await this.pageTextMatchesAll(this.copy.feedbackFull);
             if (!stillFeedback) break;
-            const nxt = this.page.getByText(this.copy.nextOrContinueExact).first();
-            if (await nxt.isVisible({ timeout: 700 }).catch(() => false)) {
-                await nxt.click({ force: true }).catch(() => {});
+            // `this.copy.nextOrContinueExact` can itself throw (e.g. a language with no
+            // translation for 'next'/'continue' yet) — deferred into the async chain the
+            // trailing `.catch()` covers, so a missing translation degrades to the geometric
+            // "→" fallback below instead of crashing this otherwise-optional check (same shape
+            // as D-12's `recoverIfDisconnected` fix; English is unaffected since its 'next'/
+            // 'continue' values already resolve and this path is unreachable for it).
+            const nxtVisible = await Promise.resolve()
+                .then(() => this.page.getByText(this.copy.nextOrContinueExact).first().isVisible({ timeout: 700 }))
+                .catch(() => false);
+            if (nxtVisible) {
+                await this.page.getByText(this.copy.nextOrContinueExact).first().click({ force: true }).catch(() => {});
                 await this.page.waitForTimeout(900);
             } else {
                 await this.clickChallengeAdvance();              // fall back to a centred "→"
@@ -1229,6 +1280,59 @@ export class FoundationPage {
             : completed(`left the Memory Challenge after ${maxRounds} rounds`);
     }
 
+    /** True when F2 has been completed — the account has moved on to F3 or beyond: showing
+     *  the F3 entry, already inside an F3 game, or past F3 entirely. */
+    async isPastF2(): Promise<boolean> {
+        if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge() || await this.isPastF3()) {
+            return true;
+        }
+        return await this.page.getByText(this.copy.startF3).first().isVisible({ timeout: 500 }).catch(() => false);
+    }
+
+    /** Where a parked account has come to rest, relative to F2. */
+    async f2Position(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry' | 'unknown'> {
+        // Ordered cheapest-first, and 'past' first for the same reason f3Position is: a
+        // decayed account must be classified as decayed, not as an unknown screen.
+        if (await this.isPastF2()) {
+            return 'past';
+        }
+        if ((await this.trainProgress()) !== '' || await this.isOnWordRecognition() || await this.isOnApplyEntry()) {
+            return 'in-game';
+        }
+        // Last, and the only one that waits — the journey map may still be rendering. Checked
+        // against the F2-specific pattern (not the generic startFoundationButton()), so a
+        // "Start F1" or "Start F3" entry is never misread as "at F2 entry" (see EL-4/P2-19,
+        // which found the footer level image unreliable on this exact raw entry screen).
+        if (await this.page.getByText(this.copy.startF2).first().isVisible({ timeout: entryTimeoutMs }).catch(() => false)) {
+            return 'at-entry';
+        }
+        return 'unknown';
+    }
+
+    /**
+     * Assert a parked account is somewhere the F2 drive can start from, and report WHERE.
+     *
+     * Mirrors `expectPositionedForF3`. The F2 spec's previous precondition (a bare
+     * `startFoundationButton()` visibility check) could not tell "Start F2" apart from any
+     * other level's entry text-wise, so a resume that landed on the wrong screen would only
+     * surface later as a confusing failure inside `completeFoundationThroughApply`. Returning
+     * the position rather than just passing/failing lets the caller treat a forward-decayed
+     * account as the account-state problem it is.
+     */
+    async expectPositionedForF2(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry'> {
+        const position = await this.f2Position(entryTimeoutMs);
+        if (position === 'unknown') {
+            await this.captureState('f2-precondition-unrecognised');
+            throw new Error(
+                'F2 precondition failed: after login and resume the account is not at an F2 entry '
+                + '("Start F2"), not inside an F2 lesson (Letter Train / Letter Recognition '
+                + 'practice / Apply), and not past F2. This is a RESUME or ACCOUNT-STATE failure, '
+                + `not a failure of the F2 drive. Screen text: "${await this.pageTextHead()}"`,
+            );
+        }
+        return position;
+    }
+
     /** True when F3 has been completed — the app leaves F3 for the next-phase ("Words
      *  per minute" / "Start Level") journey map, so `foundationLevel` is no longer F3. */
     async isPastF3(): Promise<boolean> {
@@ -1239,10 +1343,35 @@ export class FoundationPage {
     async f3Position(entryTimeoutMs = 20000): Promise<'past' | 'in-game' | 'at-entry' | 'unknown'> {
         // Ordered cheapest-first, and 'past' first because the next-phase map is a distinct
         // screen: a decayed account must be classified as decayed, not as an unknown screen.
-        if (await this.isPastF3()) {
+        // `isPastF3()` can itself throw (e.g. a language missing one of wordsPerMinute/
+        // wordsLearnt/startLevel — the "next phase" screen can only ever be observed AFTER
+        // actually finishing F3, a chicken-and-egg problem for a brand-new language) — deferred
+        // here into the async chain the trailing `.catch()` covers, so a missing translation
+        // degrades to "not detected as past" for THIS classifier only, rather than crashing it.
+        // Safe, not just convenient: an account that really is past F3 but can't be confirmed as
+        // such still falls through the checks below to 'unknown' (never a false 'at-entry'),
+        // which `expectPositionedForF3()` turns into its own clear diagnostic throw. `isPastF3()`
+        // ITSELF is intentionally left throwing everywhere else (e.g. `completeF3()`'s own
+        // completion check, `foundation-f3.spec.ts`'s final assertion) — those callers need a
+        // true signal, not a silently-masked one.
+        const past = await Promise.resolve().then(() => this.isPastF3()).catch(() => false);
+        if (past) {
             return 'past';
         }
-        if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge()) {
+        // Same reasoning as `past` above: `letterLauncher`/`memoryChallenge` can be unobserved
+        // for a language that hasn't reached an actual F3 game screen yet (true for Hindi as of
+        // this session — these keys can only ever be observed FROM inside F3, a chicken-and-egg
+        // problem for the very first live attempt to get there). Deferred + caught here so a
+        // missing translation doesn't block classifying an account that's plainly just sitting at
+        // the F3 ENTRY (not in a game at all) — confirmed live: a real "F3 शुरू करें" entry
+        // screenshot hit this exact throw before reaching the `startFoundationButton` check below,
+        // which would otherwise have classified it correctly. `isOnLetterLauncher()`/
+        // `isOnMemoryChallenge()` themselves are left throwing everywhere else (`completeF3()`'s
+        // own dispatch loop needs a true signal to know which game to solve, not a masked one).
+        const inGame = await Promise.resolve()
+            .then(async () => await this.isOnLetterLauncher() || await this.isOnMemoryChallenge())
+            .catch(() => false);
+        if (inGame) {
             return 'in-game';
         }
         // Last, and the only one that waits — the journey map may still be rendering.
@@ -1311,18 +1440,40 @@ export class FoundationPage {
         await this.installLetterLauncherHook();          // before Start F3 → capture launcher audio
         const done: string[] = [];
         let stuck = 0, entered = false;
+        // `isPastF3()`/`isOnLetterLauncher()`/`isOnMemoryChallenge()` can each throw for a
+        // language missing their translation — deferred+caught here (same shape as the
+        // `f3Position()` fixes above) so a missing translation degrades to "not detected" for
+        // THESE per-tick dispatch checks specifically, rather than blocking the loop before it
+        // ever reaches the already-safe, already-working handlers below (`clickChallengeAdvance`,
+        // the F3 intro's `introSkip`, which already has a real Hindi value for `skipDemoExact`).
+        // Confirmed live: without this, the F3 intro carousel throws on `letterLauncher` before
+        // `introSkip` — which would otherwise have clicked past it — ever runs. Correctness is
+        // preserved: `isOnLetterLauncher()`/`isOnMemoryChallenge()` themselves still throw for
+        // every OTHER caller (e.g. `f3Position()`'s own separately-guarded call), and a language
+        // that can never detect any of these three correctly still can't silently pass — it falls
+        // through every branch here to the `stuck > 12` unrecognised-screen throw below, with a
+        // real screenshot, same as before this fix.
+        const past = (): Promise<boolean> => Promise.resolve().then(() => this.isPastF3()).catch(() => false);
+        const inGame = (): Promise<boolean> => Promise.resolve()
+            .then(async () => await this.isOnLetterLauncher() || await this.isOnMemoryChallenge())
+            .catch(() => false);
+        const onLauncher = (): Promise<boolean> => Promise.resolve().then(() => this.isOnLetterLauncher()).catch(() => false);
+        const onMemory = (): Promise<boolean> => Promise.resolve().then(() => this.isOnMemoryChallenge()).catch(() => false);
+        const settledOrPast = async (): Promise<boolean> =>
+            await inGame() || await this.isOnApplyEntry() || await past();
+
         for (let i = 0; i < maxNodes; i++) {
-            if (entered && await this.isPastF3()) return done;          // F3 finished → next phase
+            if (entered && await past()) return done;          // F3 finished → next phase
             if (!entered && await this.clickStartFoundationIfPresent()) { entered = true; done.push('StartF3'); stuck = 0; continue; }
             // A game is recorded in `done` ONLY when its solver says it finished. This used to
             // push 'LL'/'MC' unconditionally, so a solver that gave up without playing the game
             // still contributed to the log the F3 spec asserts on — a game that did nothing
             // produced a green test. See SolverResult.
-            if (await this.isOnLetterLauncher()) {
+            if (await onLauncher()) {
                 await this.recordF3Game('Letter Launcher', 'LL', done, await this.completeLetterLauncher());
                 stuck = 0; continue;
             }
-            if (await this.isOnMemoryChallenge()) {
+            if (await onMemory()) {
                 await this.recordF3Game('Memory Challenge', 'MC', done, await this.completeMemoryChallenge());
                 stuck = 0; continue;
             }
@@ -1330,7 +1481,7 @@ export class FoundationPage {
             if (await this.clickChallengeAdvance()) {
                 // Fast-poll so the next game (esp. a Memory Challenge with a short memorize
                 // window) is entered promptly rather than after a fixed wait.
-                for (let k = 0; k < 18; k++) { if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge() || await this.isOnApplyEntry() || await this.isPastF3()) break; await this.page.waitForTimeout(150); }
+                for (let k = 0; k < 18; k++) { if (await settledOrPast()) break; await this.page.waitForTimeout(150); }
                 stuck = 0; continue;
             }
             // F3 launcher demo intro ("Captain Rahi! … our rocket needs fuel! — Skip Demo"),
@@ -1339,10 +1490,10 @@ export class FoundationPage {
             const introSkip = this.page.getByText(this.copy.skipDemoExact).first();
             if (await introSkip.isVisible({ timeout: 500 }).catch(() => false)) {
                 await introSkip.click({ force: true }).catch(() => {});
-                for (let k = 0; k < 18; k++) { if (await this.isOnLetterLauncher() || await this.isOnMemoryChallenge() || await this.isOnApplyEntry() || await this.isPastF3()) break; await this.page.waitForTimeout(150); }
+                for (let k = 0; k < 18; k++) { if (await settledOrPast()) break; await this.page.waitForTimeout(150); }
                 stuck = 0; continue;
             }
-            if (entered && await this.isPastF3()) return done;
+            if (entered && await past()) return done;
             stuck++;
             if (stuck >= 4 && await this.recoverIfDisconnected()) { stuck = 0; continue; }
             if (stuck > 12) { await this.captureState('f3-unrecognised'); throw new Error(`completeF3: unrecognised screen after ${done.length} games (${done.join(' ')}). Page text: "${await this.pageTextHead()}"`); }

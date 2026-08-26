@@ -93,6 +93,16 @@ export function foundationTransitionPriority(lang: AppLanguage): RegExp[] {
         tryTransitionRe([K.continue], lang),
         tryTransitionRe([K.next], lang),
         tryTransitionRe([K.letsGo, K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+        // Low-priority fallback: some celebration/completion screens render their "Continue"
+        // button in FIXED ENGLISH regardless of app language — the same "app-shell chrome isn't
+        // localized" pattern already confirmed for the mic-calibration Skip button and the
+        // help-language modal (H-1/D-10). Observed live (EL-19, docs/HINDI_ROLLOUT_LOG.md): F3's
+        // post-Letter-Launcher celebration screen showed a literal "→ Continue" button in
+        // English while every other word on that same screen was Hindi. Checked LAST, after every
+        // language-specific slot above, so a language whose "Continue" IS translated (Hindi's own
+        // `continueLabel`, confirmed elsewhere) always matches that first — this only fires when
+        // nothing else did.
+        tryTransitionRe([K.continue], languageByCode('english')),
     ].filter((re): re is RegExp => re !== null);
 }
 
