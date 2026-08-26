@@ -28,7 +28,7 @@
  */
 
 import { AppLanguage, languageByCode } from './languages';
-import { CopyKey, copyAlt, copyRe } from './UiCopy';
+import { CopyKey, copyAlt, copyRe, tryCopyRe } from './UiCopy';
 
 /**
  * The `uiCopy` keys for the advance-button vocabulary, named so each site can reference a slot
@@ -73,18 +73,27 @@ export function transitionRe(keys: readonly CopyKey[], lang: AppLanguage): RegEx
     return copyRe(keys, lang, APOSTROPHE);
 }
 
+/** `transitionRe`, but `null` instead of throwing when `lang` has no value for `keys` — for
+ *  priority-ordered slot lists where a language missing one slot's translation should just have
+ *  fewer priority slots to try, not lose the slots it DOES have (see `foundationTransitionPriority`). */
+export function tryTransitionRe(keys: readonly CopyKey[], lang: AppLanguage): RegExp | null {
+    return tryCopyRe(keys, lang, APOSTROPHE);
+}
+
 /**
  * FoundationPage's priority-ordered advance patterns — same order and unanchored substring
- * semantics as before: the compound/specific labels first, then the rest as one group.
+ * semantics as before: the compound/specific labels first, then the rest as one group. A
+ * language missing a slot's translation just has that slot dropped (`clickChallengeAdvance`
+ * iterates the array trying each in turn, so a shorter list costs it nothing but that label).
  */
 export function foundationTransitionPriority(lang: AppLanguage): RegExp[] {
     return [
-        transitionRe([K.startGame], lang),
-        transitionRe([K.nextLevel], lang),   // checked before plain "Next" so the more specific label wins
-        transitionRe([K.continue], lang),
-        transitionRe([K.next], lang),
-        transitionRe([K.letsGo, K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
-    ];
+        tryTransitionRe([K.startGame], lang),
+        tryTransitionRe([K.nextLevel], lang),   // checked before plain "Next" so the more specific label wins
+        tryTransitionRe([K.continue], lang),
+        tryTransitionRe([K.next], lang),
+        tryTransitionRe([K.letsGo, K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
+    ].filter((re): re is RegExp => re !== null);
 }
 
 /** All labels MasteryPage matches, as ONE anchored alternation — `MasteryPage.TRANSITION_RE`. */

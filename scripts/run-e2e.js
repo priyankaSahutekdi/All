@@ -19,7 +19,8 @@ const { spawnSync } = require('child_process');
 
 // The real, production regression test cases (excludes scratch/debug specs).
 const REGRESSION_SPECS = [
-    'src/tests/discovery/discovery-e2e.spec.ts',   // TC-001..TC-019 (Discovery + F1)
+    'src/tests/discovery/discovery.spec.ts',       // TC-001..TC-012 (Discovery)
+    'src/tests/discovery/foundation-f1.spec.ts',   // TC-013..TC-019 (F1)
     'src/tests/discovery/foundation-f2.spec.ts',   // TC-020 (F2)
     'src/tests/discovery/foundation-f3.spec.ts',   // TC-021/TC-022 (F3)
     'src/tests/discovery/mastery-m4.spec.ts',      // TC-023 (M4 P1-P4)

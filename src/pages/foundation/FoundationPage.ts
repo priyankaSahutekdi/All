@@ -8,9 +8,9 @@ import {
 } from '../../utils/Text';
 import { AppLanguage, ANY_LANGUAGE_LABEL, labelRe, languageByCode } from '../../utils/languages';
 import {
-    TRANSITION_KEYS, foundationTransitionPriority, transitionAlt, transitionRe,
+    TRANSITION_KEYS, foundationTransitionPriority, transitionRe,
 } from '../../utils/transitions';
-import { copy, copyAlt, copyRe, copyWordsAlt, lazyProp, tryCopyRe } from '../../utils/UiCopy';
+import { copy, copyAlt, copyRe, copyWordsAlt, lazyProp, tryCopyAlt, tryCopyRe, CopyKey } from '../../utils/UiCopy';
 import { letsStartButtonClosure } from '../../utils/GeometryLocator';
 
 const K = TRANSITION_KEYS;
@@ -39,7 +39,15 @@ export interface FoundationCopy {
     pastF3: RegExp;
     feedbackShort: RegExp;
     feedbackFull: RegExp;
-    completion: RegExp;
+    /**
+     * `null` in a language that hasn't observed all of 'hurray'/'successfully'/'complete' yet
+     * (Hindi: only 'hurray' is confirmed). This is a secondary, best-effort early-exit check —
+     * `trainProgress()`/`isOnApplyEntry()` are the primary completion signals at every call
+     * site — so a language with partial coverage should skip it, not throw. Confirmed live
+     * (2026-08-25): a Hindi P1 Letter Hunt practice advances straight to L2 with no distinct
+     * completion banner at all, so the check being skipped there costs nothing.
+     */
+    completion: RegExp | null;
     connectionLost: RegExp;
     tryAgainExact: RegExp;
     notAnAnswerOption: RegExp;
@@ -79,6 +87,28 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
      *  Digits use DIGIT_CLASS (script-agnostic), hence the 'u' flag. */
     const counter = (key: 'fuelLabel' | 'progressLabel'): RegExp =>
         new RegExp(`${copyAlt(key, lang)}:\\s*([${DIGIT_CLASS}]+)\\s*\\/\\s*([${DIGIT_CLASS}]+)`, 'iu');
+
+    /**
+     * One OR-branch of a multi-signal "any of these means X" pattern (e.g. `pastApplyMarkers`),
+     * included only if `lang` has an observed value for `key` — via `tryCopyAlt`, not `copyAlt`.
+     * These markers combine several INDEPENDENT signals (any one is sufficient), so a language
+     * missing one signal's translation should just check with fewer branches, not throw and lose
+     * the branches it DOES have. This never introduces an English fallback (no false-positive
+     * risk, per uiCopy.ts's DESIGN note) — it only omits a branch nobody has observed yet.
+     */
+    const optFrag = (key: CopyKey, template: (frag: string) => string = (f) => f): string[] => {
+        const frag = tryCopyAlt(key, lang);
+        return frag !== null ? [template(frag)] : [];
+    };
+    /** `optFrag`, but for the transition-button vocabulary (`transitionAlt`'s apostrophe rule). */
+    const optTransitionFrag = (keys: readonly CopyKey[], template: (frag: string) => string = (f) => f): string[] => {
+        const frag = tryCopyAlt(keys, lang, { apostrophe: 'optional' });
+        return frag !== null ? [template(frag)] : [];
+    };
+    /** A joined alternation, or a pattern that can never match if every branch was dropped —
+     *  so a marker set with zero observed fragments behaves as "never matches", not as the
+     *  empty regex's actual behaviour of matching every string. */
+    const orNone = (fragments: string[]): string => fragments.length ? fragments.join('|') : '[^\\s\\S]';
 
     const p = {} as FoundationCopy;
 
@@ -120,7 +150,7 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
     /** Correct-answer feedback still on screen. Two subsets, as the two call sites had. */
     lazyProp(p, 'feedbackShort', () => copyRe(['correct', 'great'], lang));
     lazyProp(p, 'feedbackFull', () => copyRe(['correct', 'great', 'wellDone'], lang));
-    lazyProp(p, 'completion', () => copyRe(['hurray', 'successfully', 'complete'], lang));
+    lazyProp(p, 'completion', () => tryCopyRe(['hurray', 'successfully', 'complete'], lang));
 
     lazyProp(p, 'connectionLost', () => copyRe(['couldntConnect', 'checkInternet'], lang, { apostrophe: 'optional' }));
     lazyProp(p, 'tryAgainExact', () => copyRe('tryAgain', lang, { exact: true }));
@@ -130,15 +160,15 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
      * "Next" is anchored (a bare "Next" button) while the rest are substrings, exactly as
      * the inline literal was.
      */
-    lazyProp(p, 'notAnAnswerOption', () => new RegExp([
-        transitionAlt([K.nextLevel], lang),
-        transitionAlt([K.continue], lang),
-        transitionAlt([K.startGame], lang),
-        transitionAlt([K.skipDemo], lang),
-        `^${transitionAlt([K.next], lang)}$`,
-        copyAlt('confirm', lang),
-        transitionAlt([K.claim, K.collect, K.finish, K.done, K.playAgain], lang),
-    ].join('|'), 'i'));
+    lazyProp(p, 'notAnAnswerOption', () => new RegExp(orNone([
+        ...optTransitionFrag([K.nextLevel]),
+        ...optTransitionFrag([K.continue]),
+        ...optTransitionFrag([K.startGame]),
+        ...optTransitionFrag([K.skipDemo]),
+        ...optTransitionFrag([K.next], (f) => `^${f}$`),
+        ...optFrag('confirm'),
+        ...optTransitionFrag([K.claim, K.collect, K.finish, K.done, K.playAgain]),
+    ]), 'i'));
 
     /**
      * UI chrome to exclude when scraping the Letter Launcher prompt heading. The individual
@@ -162,23 +192,23 @@ export function foundationPatterns(lang: AppLanguage): FoundationCopy {
      * backed by a definitive check at the call site.
      */
     lazyProp(p, 'pastApplyMarkers', () => new RegExp([
-        copyAlt('complete', lang),
-        copyAlt('congratulations', lang),
-        copyAlt('wellDone', lang),
+        ...optFrag('complete'),
+        ...optFrag('congratulations'),
+        ...optFrag('wellDone'),
         'F2',
-        `${copyAlt('levelWord', lang)} 2`,
-        `${copyAlt('foundationWord', lang)} 2`,
-        copyAlt('hurray', lang),
+        ...optFrag('levelWord', (f) => `${f} 2`),
+        ...optFrag('foundationWord', (f) => `${f} 2`),
+        ...optFrag('hurray'),
     ].join('|'), 'i'));
     /** Digits in the `levelWord` fragment use DIGIT_CLASS (script-agnostic), hence 'u'.
      *  `startFoundation('F\\d', ...)`'s F# stays ASCII — it's a level CODE, not translated
      *  copy, rendered identically in every language (see the class-level note above). */
     lazyProp(p, 'applyCompletedMarkers', () => new RegExp([
-        copyAlt('complete', lang),
-        copyAlt('congratulations', lang),
-        copyAlt('wellDone', lang),
-        copyAlt('foundationWord', lang),
-        `${copyAlt('levelWord', lang)} [${DIGIT_CLASS}]`,
+        ...optFrag('complete'),
+        ...optFrag('congratulations'),
+        ...optFrag('wellDone'),
+        ...optFrag('foundationWord'),
+        ...optFrag('levelWord', (f) => `${f} [${DIGIT_CLASS}]`),
         startFoundation('F\\d', 'exact'),
     ].join('|'), 'iu'));
 
@@ -808,7 +838,16 @@ export class FoundationPage {
                 if ((await this.trainProgress()) !== '') {
                     return completed(`advanced to the next Letter Train after ${q} questions`);
                 }
-                if (await this.pageTextMatchesAll(this.copy.completion)) {
+                // Every 3rd practice (P3, P6, P9) completes onto an Apply entry ("Ready for
+                // Challenge?"), not another Letter Train. Same class of gap as A3's terminal
+                // state in completeApplyChallenge(): trainProgress()/completion alone don't
+                // cover it, so the loop would spin failing to read a question that no longer
+                // exists. F2's completeWordRecognitionPractice() already checks this; F1's
+                // never did.
+                if (await this.isOnApplyEntry()) {
+                    return completed(`reached an Apply entry after ${q} questions`);
+                }
+                if (this.copy.completion !== null && await this.pageTextMatchesAll(this.copy.completion)) {
                     return completed(`reached a completion screen after ${q} questions`);
                 }
                 const letter = await this.readSpokenLetter();
@@ -927,7 +966,7 @@ export class FoundationPage {
                 if (await this.isOnApplyEntry()) {
                     return completed(`reached an Apply entry after ${q} questions`);
                 }
-                if (await this.pageTextMatchesAll(this.copy.completion)) {
+                if (this.copy.completion !== null && await this.pageTextMatchesAll(this.copy.completion)) {
                     return completed(`reached a completion screen after ${q} questions`);
                 }
                 const token = await this.readSpokenViaSpeaker();
@@ -1337,6 +1376,15 @@ export class FoundationPage {
             for (let i = 0; i < 120; i++) {
                 if ((await this.trainProgress()) !== '') {
                     return completed(`reached the next Letter Train after ${i} iterations`);
+                }
+                // The level's FINAL Apply (e.g. F1's A3) does not lead to another Letter
+                // Train — it lands directly on the next level's "Start F#" entry (or an
+                // equivalent completion screen). Without this check the loop finishes the
+                // challenge correctly, then spins forever seeing neither a question nor an
+                // advance control, because trainProgress() alone never turns non-empty.
+                if ((await this.startFoundationButton().isVisible({ timeout: 500 }).catch(() => false))
+                    || await this.pageTextMatchesAll(this.copy.applyCompletedMarkers)) {
+                    return completed(`advanced past the final Apply after ${i} iterations (level-complete screen)`);
                 }
                 if (await this.hasLetterOptions()) {               // F1 apply: single-letter options
                     const letter = await this.readSpokenLetter();
