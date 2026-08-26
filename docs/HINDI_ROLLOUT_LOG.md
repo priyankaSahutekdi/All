@@ -484,6 +484,11 @@ deviations and other choices are in [Decisions Log](#decisions-log).
 > `foundationPatterns()` builds every pattern eagerly at construction and would otherwise throw
 > on an F3-only key during an F1-only run (finding **H-5**). That is **observation only** — no
 > Hindi F2/F3 spec, solver or assertion is to be written. See [Phase 4](#phase-4--hindi-discovery--f1) at the bottom.
+>
+> **SUPERSEDED 2026-08-26 — see [Decisions Log, D-14](#decisions-log):** H12 is now fixed by the
+> app team. Hindi F2 (TC-020) / F3 (TC-021/022) are back IN SCOPE; a real Hindi spec/solver/
+> assertion pass is now underway via the dynamic-user `FULL_E2E=1` path. This note is kept verbatim
+> above for history, per this doc's append-only convention.
 
 ### Status legend
 
@@ -1604,6 +1609,23 @@ surfacing it for the app team to fix.
 **Where recorded:** [Execution Log, EL-12](#execution-log), [Verification Summary](#verification-summary), [Open TODOs](#open-todos)
 (H12 entry), [Current Status](#current-status).
 
+### D-14 — H12 confirmed fixed by the app team; scope revised to bring Hindi F2/F3 in scope
+
+**Date:** 2026-08-26
+**Decision:** The 2026-08-18 "SCOPE DECISION — HINDI" note above (capping Hindi work at TC-019,
+Hindi F2/F3 OUT OF SCOPE) is **superseded, not deleted**. Per the user, H12 (D-13's Marathi-content
+app bug) is now fixed by the app team. Hindi F2 (TC-020) / F3 (TC-021/022) automation moves from
+OUT OF SCOPE to IN PROGRESS.
+**Why:** D-13's OUT-OF-SCOPE call was explicitly conditioned on H12 being an open app-side blocker
+("Hindi doesn't even reach F2/F3 yet") — that condition no longer holds.
+**Live confirmation (same day):** `FULL_E2E=1 TEST_LANG=hindi` against a fresh dynamic guest user —
+TC-001–019 (Discovery + full F1, including the previously-blocked post-L1 practice-demo screen)
+**PASSED live, ~25 min**, first real proof H12 is fixed. The run then reached F2 and stopped on a
+genuine, expected data gap: `No 'hindi' UI copy for 'letterRecognition'` — not an app bug, not a
+framework bug, just an unpopulated `uiCopy.ts` key. See [Execution Log, EL-13](#execution-log) for
+full detail, and EL-4 for the same-day `expectPositionedForF2` fix (P2-19) verified alongside it.
+**Where recorded:** this entry, [Execution Log, EL-13](#execution-log)/EL-4, [Open TODOs](#open-todos).
+
 ---
 
 ## Execution Log
@@ -1783,11 +1805,46 @@ One of two clean outcomes, not a repeat of today's ambiguous drift diagnosis:
 
 ### EL-4 — Fix P2-19: add a level-position precondition to `foundation-f2.spec.ts`
 
-**Date:** queued, not yet detailed · **Related task:** P2-19 · **Status:** 🚫 BLOCKED (deliberately held)
+**Date:** 2026-08-26 · **Related task:** P2-19 · **Status:** ✅ DONE
 
-Queued behind EL-3 so a real code change isn't made in the same breath as a diagnostic run. Will
-get its own full Objective/Expected-Outcome/Action-Items prompt, mirroring P2-4's
-`expectPositionedForF3` but for F2, once EL-3's result is in and this doc's next entry is written.
+**Note (correction):** a project memory note had previously claimed this was closed on 2026-08-24
+(`f2Position()`/`expectPositionedForF2()` added). Re-reading `FoundationPage.ts` on 2026-08-26 found
+neither method existed — that memory claim was stale/wrong, and this entry's own "queued, not yet
+detailed" status (above, now superseded) was in fact accurate. This entry is the real completion.
+
+**Objective**
+Add `f2Position()`/`expectPositionedForF2()` to `FoundationPage.ts`, mirroring
+`f3Position()`/`expectPositionedForF3()`, so `foundation-f2.spec.ts`'s precondition can tell "Start
+F2" apart from any other level's entry (the old check was a bare `startFoundationButton()`
+visibility assertion, which matches any "Start F#" text-wise).
+
+**Expected Outcome**
+`foundation-f2.spec.ts` fails fast with a clear, actionable message when `Testf2auto` has drifted
+past F2 (same shape as F3's `ALLOW_STALE_F3` handling), instead of a confusing failure surfacing
+later inside `completeFoundationThroughApply`. Zero change to F1/F3/Mastery behavior.
+
+**Action Items**
+- [x] Add `startF2`/`startF3` copy patterns to `FoundationCopy`/`foundationPatterns()` (both read
+      the already-populated `startFoundationLevel` key — no new Hindi observation needed)
+- [x] Add `isPastF2()`, `f2Position()`, `expectPositionedForF2()` to `FoundationPage.ts`
+- [x] Wire into `foundation-f2.spec.ts`'s login step; add an `ALLOW_STALE_F2` escape hatch mirroring
+      `ALLOW_STALE_F3`
+- [x] Align `foundation-f2.spec.ts`/`foundation-f3.spec.ts` imports to the `pages/foundation` barrel
+      (matches `foundation-f1.spec.ts`; was a pre-existing, unrelated inconsistency)
+- [x] `tsc --noEmit` + `eslint` on all changed files → 0 errors (pre-existing warning categories only)
+- [x] Live-verify against the real (drifted) `Testf2auto` account
+
+**Execution Record**
+- **Completion status:** ✅ DONE — live-verified, zero regression.
+- `node scripts/run-e2e.js --env=uat src/tests/discovery/foundation-f2.spec.ts` (no
+  `ALLOW_STALE_F2`): correctly detected `Testf2auto` is **past** F2 and failed fast (47s) with the
+  new actionable message, instead of the old ambiguous failure mode.
+- Same command with `ALLOW_STALE_F2=1`: skipped cleanly (41s), F3-equivalent behavior confirmed.
+- `foundation-f3.spec.ts` re-run in the same session (unrelated to this change, checked for
+  regression anyway): ✅ **PASSED, 22m14s**, full P1→A3 chain (`StartF3 LL×8 MC×3` twice,
+  `isPastF3()` true) — proves the import-barrel change didn't affect F3.
+- Reports: `tta-report/report_20260826_114213.html` (throw case), `report_20260826_120706.html`
+  (skip case).
 
 ### EL-5 — H1 (hi-IN SAPI voice) + H2a (Hindi observation probe), Discovery pre-switch screens
 
@@ -2281,6 +2338,476 @@ Diagnose why `FoundationPage.expectOnPracticeDemo()` times out (20s) after L1 Le
   - Commit the `recoverIfDisconnected` fix on its own merits (real defect, zero relation to the Marathi finding) — see [Open TODOs](#open-todos) Git section
   - Commit `TtsHelper.ts`/`FoundationPage.ts`/`TTS_VOICE_SETUP.md`/[Decisions Log](#decisions-log) (D-11) changes
 
+### EL-13 — H12 re-check + first live Hindi F2 attempt: `FULL_E2E=1 TEST_LANG=hindi`
+
+**Date:** 2026-08-26 · **Related task:** [Decisions Log, D-14](#decisions-log), H2b (F2/F3 scope
+reopened) · **Status:** ✅ DONE (TC-001–019 PASS) — 🚫 BLOCKED on TC-020, diagnosed, one gap closed live
+
+**Objective**
+Given the user's report that H12 (D-13) is now fixed by the app team, get first live confirmation
+and, if F1 depth genuinely passes, push into Hindi F2/F3 via the dynamic-user `FULL_E2E=1` path
+(no parked Hindi F2/F3 account exists, so this is the only way to reach F2/F3 in Hindi at all).
+
+**Expected Outcome**
+Either TC-014+ still fails on the D-13 Marathi content (H12 not actually fixed — stop and report),
+or it passes and the run continues into F2, where missing `uiCopy` values for F2/F3-only keys
+(`letterRecognition`, `letterLauncher`, `memoryChallenge`, `checkSequence`, `timeUp`,
+`wordsPerMinute`, `wordsLearnt`, `startLevel`, `lettersOfCount`, `fuelLabel`, `progressLabel`,
+`loading` — all confirmed English-only beforehand) are expected to surface one at a time as real
+`copy()` throws, per `uiCopy.ts`'s no-fallback design.
+
+**Action Items**
+- [x] `FULL_E2E=1 node scripts/run-e2e.js --lang=hindi --env=uat src/tests/discovery/foundation-f1.spec.ts` (headless)
+- [x] Verify pass/fail from the actual log output, not the process exit code alone
+- [x] On failure, read the exact `copy()` error and the attached failure screenshot before touching any code
+
+**Execution Record**
+- **Completion status (run 1):** ✅ TC-001–019 **PASSED**, 25m15s total, first live proof H12 is
+  genuinely fixed — real Hindi content observed throughout (हिंदी language selection, real Hindi
+  Discovery sentences/words, Letter Train + Letter Hunt practice all completing in Hindi, including
+  the exact post-L1 practice-demo screen D-13 found blocked on Marathi in 2026-08-19 — now clean).
+  Then hit `E2E-F2 (TC-020)` and failed in 12.4s: `Error: No 'hindi' UI copy for 'letterRecognition'`,
+  thrown from `FoundationPage.isOnWordRecognition()` (called inside `completeFoundationThroughApply`'s
+  node-type detection loop). Report: `tta-report/report_20260826_112704.html`.
+- **Screenshot check:** the attached failure screenshot shows F2's **L1 "शब्द बनाओ" (Build the
+  Word)** screen, journey map footer confirms `F2`. This is NOT the actual Letter-Recognition
+  practice screen — the throw fires the instant the key is first *read* (one of several node-type
+  candidate checks each loop tick), regardless of which screen is currently showing. **The
+  screenshot could not be used to observe the real string** — correctly not guessed from it.
+- **Gap closed without a new run:** this exact `letterRecognition` key/English-value pair was
+  ALREADY observed on a real Hindi build once before — [Execution Log, EL-12](#execution-log)
+  (2026-08-19) captured F1's own post-Letter-Train practice-demo screen containing `अक्षर पहचान`
+  ("Letter Recognition") as confirmed-correct Hindi (the Marathi finding, D-13, was about
+  *different* substrings on that same screen — `पातळी`/`डेमो वगळा`/`गेम सुरू करा` — not this one).
+  `isOnWordRecognition()` matches `letterRecognition` via a whole-page text scan, not a
+  level-specific locator, so this F1-observed generic activity-type heading is directly reusable
+  for F2. Added to `src/utils/uiCopyData.ts` with a citation back to EL-12 (not re-guessed,
+  not re-translated). `tsc --noEmit` clean after the addition.
+- **Completion status (run 2, same-day re-run after the fix):** ✅ TC-001–019 PASSED again
+  (confirms run 1 wasn't a fluke), progressed further into F2 — L1 done, into P1 "Letter
+  Recognition" practice (screenshot confirms the heading is exactly the observed `अक्षर पहचान`,
+  progress `1/10`, first question answered correctly, `🎉 सही है।` feedback shown) — then failed
+  29m53s in on a SECOND missing key: `No 'hindi' UI copy for 'next'`, from
+  `FoundationPage.tapWordAndAdvance()` (line ~943) reading `this.copy.nextOrContinueExact`.
+  Report: `tta-report/report_20260826_121037.html`. Continued in [Execution Log, EL-14](#execution-log)
+  — this one turned out not to be a data gap at all.
+- **Issues / blockers encountered:** none beyond the expected, by-design `copy()` throw.
+- **Observations:**
+  - This is exactly the diagnostic pattern the plan anticipated: a `copy()` throw names the exact
+    missing key, but the failure screenshot's usefulness depends entirely on WHERE in the node-type
+    detection loop the throw fires — it is not automatically evidence of the right screen.
+  - Re-checking this doc's own history before doing new live observation work paid off directly:
+    the string needed for F2 had already been captured, incidentally, during F1 work seven days
+    earlier, and was sitting unused in [Execution Log, EL-12](#execution-log) rather than in
+    `uiCopyData.ts`.
+- **Next steps:** confirm run 2's result; if F2 still throws (a different key), repeat this same
+  "check the log, check EL-12/EL-8/EL-10's prior observations before assuming a new live drive is
+  needed" discipline before defaulting to a fresh throwaway probe.
+
+### EL-14 — `next` throw wasn't a data gap: `tapWordAndAdvance`'s optional Next-button check had no fallback path, mirroring D-12
+
+**Date:** 2026-08-26 · **Related task:** EL-13 follow-on · **Status:** ✅ DONE
+
+**Objective**
+Diagnose EL-13 run 2's `No 'hindi' UI copy for 'next'` throw before assuming it needs a new
+Hindi-string observation.
+
+**Execution Record**
+- **Completion status:** ✅ DONE — this was a language-independent code defect, not a missing
+  translation, same defect shape as [Decisions Log, D-12](#decisions-log).
+- **Diagnosis:** `tapWordAndAdvance()` (`FoundationPage.ts`) checks for a "Next"/"Continue" button
+  only as a BEST-EFFORT step — its own `else` branch already falls back to
+  `clickChallengeAdvance()`, a purely geometric "centred →" click needing no text match at all
+  (the code comment even says "F2 may auto-advance, or show a Next/Continue/→"). But the lazy-prop
+  read `this.copy.nextOrContinueExact` on the line building the text locator throws the instant
+  it's evaluated — before the `else` branch (the working fallback) ever gets a chance to run. The
+  failure screenshot confirms the app WAS mid-way through this exact optional check (feedback
+  banner `🎉 सही है।` still visible, matching `stillFeedback` being true) — it is not evidence that
+  a Hindi "Next" string needs observing, only that this check needs to fail soft.
+- **Fix** (`FoundationPage.ts`, `tapWordAndAdvance`): deferred the `this.copy.nextOrContinueExact`
+  read into the async chain the trailing `.catch(() => false)` covers, so a missing translation
+  degrades to the existing geometric fallback instead of crashing — identical shape to D-12's
+  `recoverIfDisconnected`/`isDown()` fix. English is unaffected: its `next`/`continueLabel` values
+  already resolve, so this path was never reachable for it, and the fix doesn't change what happens
+  when the read succeeds (same locator, same click, same fallback logic either way).
+- `tsc --noEmit` clean after the change.
+- **Next steps:** re-run `FULL_E2E=1 TEST_LANG=hindi` (run 3) to confirm F2 now gets past this point
+  — see [Execution Log, EL-15](#execution-log) for the result.
+- **Observation:** two of `FoundationPage.ts`'s three real gaps found so far in Hindi F2/F3
+  (D-12, this entry) have been the SAME defect class — an eagerly-read lazy `this.copy` property
+  inside what the surrounding code clearly intends as an optional/best-effort check with a working
+  fallback already sitting right next to it. Worth a deliberate audit for more instances of this
+  specific shape (not just any hardcoded string) before assuming every future throw is a genuine
+  data gap.
+
+### EL-15 — Run 3: F2 A1+A2 completed live in Hindi; then landed on an F3 screen instead of an A3 entry — genuinely uncertain, flagged for the user rather than guessed at
+
+**Date:** 2026-08-26 · **Related task:** EL-13/EL-14 follow-on · **Status:** 🚫 BLOCKED — real finding, needs a decision, NOT coded around
+
+**Objective**
+Re-run `FULL_E2E=1 TEST_LANG=hindi` after EL-14's fix to see how far F2 gets.
+
+**Execution Record**
+- **Completion status:** 🚫 BLOCKED on a genuine open question, not a bug fixed to closure.
+- **Real progress:** TC-001–019 PASSED again (3rd consecutive pass). F2: `completeFoundationThroughApply(1)`
+  → `StartF P P P A1` (A1 done, live). `completeFoundationThroughApply(2, 2)` (intended: complete
+  A2 then A3) → `P P P A2` (A2 done, live) — then the loop, still hunting for a second Apply,
+  spent 10+ ticks unable to recognise the next screen and threw, 45m40s in. Report:
+  `tta-report/report_20260826_124255.html`.
+- **What the failure screenshot + accessibility snapshot actually show:** NOT an F2 A3 entry. The
+  footer level image reads `F3`, the node pills are `P1 P2 P3 P4 P5 A1 P6 P7 P8` (F3's own Letter
+  Launcher structure per `foundation-f3.spec.ts`'s docstring), and the screen is a rocket/astronaut
+  intro reading "तुम्हारा रॉकेट लॉन्च पैड पर इंतजार कर रहा है…" with a "डेमो छोड़ें" (Skip Demo)
+  button — i.e. **F3's Letter Launcher intro/demo screen**, a screen type
+  `completeFoundationThroughApply` has no vocabulary for (by design — F3 mechanics are driven by
+  the separate `completeF3()`).
+  - **Screenshot review is correctly NOT being used to guess new Hindi copy here** — this isn't a
+    missing-key throw at all (no `copy()` error), it's a "ran out of recognised node types" throw,
+    which is the code correctly refusing to guess rather than silently mismarking a false pass.
+- **Genuinely open question — not resolved this session:** every prior confirmation (English,
+  multiple runs, `EL-3` and others) shows F2 has **3** Applies (A1, A2, A3) before F3. This live
+  Hindi run shows only **2** (A1, A2) before the account is already on an F3 screen. Two
+  explanations are both plausible from the evidence alone, and this session is NOT picking one:
+  1. **A real content difference**: this Hindi build's F2 may genuinely ship with 2 Applies instead
+     of 3 (app content/config can differ by language) — in which case `completeFoundationThroughApply(2, 2)`'s hardcoded expectation of a
+     3rd apply (baked into the `FULL_E2E` continuation in `foundation-f1.spec.ts`, comment "A2, then
+     A3") is a call-site assumption that doesn't hold for Hindi, not a defect in the generic driver.
+  2. **A detection gap**: an actual F2 A3 entry screen may exist between A2 and this F3 intro and
+     is being walked past unrecognised (all of `isOnApplyEntry`/`trainProgress`/`isOnWordRecognition`/
+     `isOnPracticeDemo` returned false for 10+ ticks, so if an A3 entry was ever shown, none of those
+     checks matched it in Hindi).
+  - **Deliberately not distinguishing these without more evidence** — doing so would mean either
+    silently changing the FULL_E2E script's apply count (masking a possible real detection gap) or
+    declaring "it's just missing copy" (masking a possible real content difference). Both are
+    guesses this project's rules explicitly reject.
+- **Why this stops here, not with another live-run guess:** the previous two gaps (EL-13, EL-14)
+  each had a single, unambiguous explanation backed directly by evidence. This one has two
+  plausible explanations that would need DIFFERENT fixes, and picking wrong risks exactly the kind
+  of silent-fallback-that-masks-a-real-bug this project has explicitly rejected before (D-13, the
+  `recoverIfDisconnected` design note, `uiCopy.ts`'s no-fallback rule).
+- **Next steps (needs a decision, not more automated guessing):**
+  1. Re-run once more, headed (not headless), watching the video/live browser around the A2→F3
+     transition specifically, to see directly whether an A3 screen ever appears and gets missed, or
+     whether the app itself jumps straight from A2 to F3.
+  2. Or: if the user (or existing QA knowledge) already knows Hindi F2 has 2 Applies by design,
+     confirm that and adjust the `FULL_E2E` call site's apply count for Hindi specifically (not the
+     generic `FoundationPage.ts` driver).
+  3. `foundation-f2.spec.ts`'s own standalone TC-020 test (as opposed to this `FULL_E2E` continuation)
+     still asserts 3 Applies unconditionally — if (1) confirms only 2 exist in Hindi, that assertion
+     will need a language-aware adjustment too, not just the FULL_E2E script.
+
+### EL-16 — EL-15 resolved: dedicated headed A1→A2 diagnostic, English vs. Hindi, same methodology — Hindi F2 genuinely has only 2 Applies
+
+**Date:** 2026-08-26 · **Related task:** EL-15 follow-on, user-directed · **Status:** ✅ DONE — real content difference confirmed, not a bug
+
+**Objective**
+Per the user's explicit ask: drive ONLY F2 (via a fresh dynamic account each), headed, and capture
+exactly what the screen/URL/footer-level/text show immediately after A2, for BOTH languages using
+the identical methodology, to distinguish EL-15's two hypotheses (real 2-vs-3-Apply content
+difference, or a detection gap that swallowed an A3 screen).
+
+**Method** (`src/tests/discovery/_a2-f3-transition-probe.spec.ts`, throwaway, not committed):
+reuses the already-proven `runDiscoveryFlow` + `completeFoundationThroughApply` — no new solver
+logic. Calls `completeFoundationThroughApply(1)` for A1, then `completeFoundationThroughApply(1, 2)`
+for exactly A2 (stops the INSTANT the apply count is satisfied — deliberately does not continue
+driving further, unlike the FULL_E2E script), then captures URL + `foundationLevel()` + full page
+text + a screenshot immediately after, then polls every 400ms for 30s capturing on every distinct
+text change (to catch even a one-tick A3 flash), run headed in parallel for `--lang=hindi` and
+`--lang=english`.
+
+**Execution Record**
+- **Completion status:** ✅ DONE, both runs PASSED (English 43m58s, Hindi 52m53s).
+- **English, immediately after A2:** `foundationLevel()="F2"`. Screenshot shows a fresh Letter
+  Train ("Syllable", progress `1/18`), node pills confirm `P7 L8 P8 L9 P9 A3` still ahead. Zero
+  text changes over the 30s window (nothing left to auto-advance without more driving).
+- **Hindi, immediately after A2:** `foundationLevel()=""` (empty — matches the pre-existing EL-4/
+  P2-19 finding that this footer image is absent on raw journey-map screens, so an empty read here
+  is itself consistent with "this is the next-level entry screen", not evidence of an error). Raw
+  captured text, verbatim: `"Guest\n0\nहिंदी\nF3 शुरू करें\nv3.0.7 · Build #17 · all-3.0.7 · a0c746a"`.
+  Screenshot confirms: the F2/F3 journey-map background with a "F3 शुरू करें" (Start F3) button and
+  Level 1/2/Beginner-1 milestones — the SAME kind of screen English shows after **its** A3, not
+  after its A2. Zero text changes over the 30s window.
+- **Conclusion:** Hindi's F2 A2 completion IS F2's final Apply — there is no A3 screen to miss (no
+  flash, no intermediate state, confirmed by the 30s zero-change window on both runs) and no
+  content for one. This is a genuine content/structure difference between the English and Hindi
+  builds of F2 (3 Applies vs. 2), reproducible now across TWO independent fresh accounts (this run
+  and EL-15's original FULL_E2E run) — not a detection gap, not a framework bug.
+- **Screenshots/log:** `test-results/a2-f3-diagnostic/{english,hindi}-0{1..5}-*.png` +
+  `{english,hindi}-log.txt`.
+- **Consequence for code:** the `FULL_E2E` continuation in `foundation-f1.spec.ts` (`completeFoundationThroughApply(2, 2)` — hardcoded "F2 has 2 more Applies after A1") and `foundation-f2.spec.ts`'s
+  own TC-020 (asserts A1+A2+A3 unconditionally) both assume English's 3-Apply structure. Whether to
+  make these language-aware, or treat 2-Apply Hindi F2 as its own accepted target, is a scope/spec
+  decision for the user — not made unilaterally here (mirrors D-13's precedent: report the finding,
+  don't silently code around it).
+
+### EL-17 — Resuming into F3: a real `switchToLanguage` bug, an initial fix that was too blunt, then the correct root-cause fix
+
+**Date:** 2026-08-26 · **Related task:** EL-16 follow-on · **Status:** ✅ DONE (real root cause fixed) — F3 drive itself not yet completed, see next entry
+
+**Objective**
+Resume `testuser_1787739030848` (parked exactly at "F3 शुरू करें" by EL-16) directly into F3,
+skipping a ~50-minute Discovery+F1+F2 replay, to (a) confirm F3 itself is reachable/drivable in
+Hindi and (b) observe F3's real screens for the still-unpopulated `letterLauncher`/
+`memoryChallenge`/etc. keys.
+
+**Execution Record**
+- **Attempt 1 FAILED, 24s in**, before ever reaching F3: `resumeParkedAccount` →
+  `FoundationPage.switchToLanguage('hindi')` threw `No 'hindi' UI copy for 'chooseHelpLanguage'`,
+  from step 1's `this.copy.helpLanguageModal` read (eagerly evaluated ahead of the `.isVisible()
+  .catch()` chain it's passed to — same throw SHAPE as D-12/EL-14). This is the FIRST time
+  `switchToLanguage('hindi')` has ever been exercised — every prior call site only ever switched TO
+  English (parked F2/F3/M4 accounts), so this path was structurally unreachable until now.
+- **Attempt 1's fix (superseded below, kept for the record — this project doesn't silently
+  rewrite history):** deferred the `this.copy.helpLanguageModal` read into the async chain the
+  trailing `.catch(() => false)` covers, treating an unreadable pattern as "modal not showing."
+  `tsc --noEmit` clean; looked like the same safe pattern as D-12/EL-14.
+- **Attempt 2 FAILED differently**, and its OWN screenshot showed why attempt 1's fix was wrong,
+  not just incomplete: the "Choose your help language" modal WAS actually showing (English text,
+  "Confirm" button, "Telugu" pre-selected — not Hindi), but attempt 1's catch-and-skip silently
+  treated it as absent instead of confirming it, so it stayed open, unconfirmed, on top of the
+  real screen. The run only got as far as it did (into `f3Position()`'s checks, throwing on
+  `letterLauncher` next) by coincidence, not because the modal was actually handled.
+- **Root cause, found from that screenshot:** this modal is the EXACT SAME screen as Discovery
+  TC-002's help-language popup, which `DiscoveryFlow.ts` already documents and correctly handles as
+  **FIXED ENGLISH regardless of the run's target language** (H-1/D-10 — "the app has not been told
+  the target yet at this point"). `switchToLanguage`'s step 1 was built from `lang` (the TARGET
+  language, e.g. Hindi) instead of hardcoded English — a latent bug present since the method was
+  written, invisible until now because every prior caller's target WAS English anyway, so the
+  wrong-language pattern happened to coincidentally match the always-English modal.
+- **Real fix** (`FoundationPage.ts`, `switchToLanguage` step 1): build the modal/confirm patterns
+  from `languageByCode('english')` explicitly, mirroring `DiscoveryFlow.ts`'s proven approach —
+  not a defensive catch, an actual correctness fix. `tsc --noEmit` clean.
+- **Attempt 3:** launched — see the next entry once it lands.
+- **Lesson (why this matters beyond this one fix):** a `.catch(() => false)`-style fix can make a
+  throw go away while leaving the underlying wrong behavior in place, silently, with no error to
+  signal it — the ONLY reason this was caught was reading the resulting screenshot instead of
+  trusting a green run. Treat "the throw is gone" as inconclusive until the actual screen state is
+  checked, not as confirmation the fix was correct — especially for these lazy-`this.copy` defensive
+  fixes, which by design suppress evidence of exactly this kind of problem.
+- **Observation (unchanged from before):** the underlying `this.copy.xxx`-throws-before-its-own-
+  `.catch()` shape has now been found 3 times (D-12, EL-14, attempt 1 here) — still worth the
+  systematic audit flagged in EL-14. But this entry adds a second, distinct lesson: fixing the
+  SYMPTOM (the throw) is not the same as fixing the CAUSE, and every such fix needs its own direct
+  evidence check, not just a clean `tsc`/a run that no longer throws.
+
+### EL-18 — `completeF3()` hardened the same way (3 more call sites); reached the real Letter Launcher screen; `letterLauncher`/`fuelLabel` observed live
+
+**Date:** 2026-08-26 · **Related task:** EL-17 follow-on · **Status:** ✅ DONE — 2 more real Hindi values added; F3 solving itself not yet complete
+
+**Execution Record**
+- **Attempt 4** (after EL-17's real fix) got past `f3Position()` cleanly and clicked "Start F3",
+  then failed inside `completeF3()`'s own loop: `isPastF3()` at line ~1420 (its per-tick completion
+  check) threw the same way, one call site further in. Same defer+catch fix applied there.
+- **Attempt 5** then failed on `isOnLetterLauncher()`/`isOnMemoryChallenge()` (lines ~1426/1430,
+  the dispatch checks) — and, crucially, this was blocking an ALREADY-WORKING, ALREADY-SAFE handler
+  a few lines below: `completeF3()` already has a specific `introSkip` branch for the F3 launcher
+  demo intro carousel, built on `skipDemoExact` (which already has a real Hindi value) — but it's
+  checked AFTER the dispatch checks, so it never ran. Applied the same defer+catch fix to
+  `isPastF3`/`isOnLetterLauncher`/`isOnMemoryChallenge` at all their call sites inside
+  `completeF3()` (including the two fast-poll compound checks) via small local helpers
+  (`past()`/`onLauncher()`/`onMemory()`/`settledOrPast()`), scoped to this method only —
+  `isOnLetterLauncher()`/`isOnMemoryChallenge()` themselves are unchanged everywhere else (e.g.
+  `f3Position()`'s own separately-fixed call in EL-17). `tsc --noEmit` clean.
+- **Attempt 6: real progress.** `introSkip` fired correctly (clicked past the intro carousel),
+  `done: StartF3` recorded, then the loop correctly landed on and stayed on F3's real first game
+  screen — but still couldn't recognise it (both `letterLauncher`/`memoryChallenge` still
+  unpopulated), so it correctly gave up after 12 ticks with a clean diagnostic instead of hanging
+  or crashing: `completeF3: unrecognised screen after 1 games (StartF3)`. Real captured page text:
+  `"...अक्षर लॉन्चर ईंधन: 0 / 50 🎯 🚀 ग..."`. Screenshot (`test-results/f3-unrecognised.png`)
+  confirms: heading **"अक्षर लॉन्चर"**, a fuel readout **"ईंधन: 0 / 50"**, a shown letter "ग", and
+  ✓/✗ buttons — exactly F3's Letter Launcher mechanic (`foundation-f3.spec.ts`'s own docstring: "a
+  shown letter OR word matched to a spoken one → press ✓/✗").
+- **Added to `uiCopyData.ts` from this direct observation** (not guessed): `letterLauncher:
+  'अक्षर लॉन्चर'`, `fuelLabel: 'ईंधन'`. `tsc --noEmit` clean.
+- **Attempt 7:** launched with these values in place, to see whether `completeLetterLauncher()`
+  can now actually detect and play the game — see the next entry once it lands.
+- **Still unpopulated:** `memoryChallenge`, `checkSequence`, `timeUp`, `wordsPerMinute`,
+  `wordsLearnt`, `startLevel`, `lettersOfCount`, `progressLabel`, `loading` — none of F3's Memory
+  Challenge mechanic has been observed yet (only Letter Launcher has been reached so far).
+
+### EL-19 — Attempt 7: `completeLetterLauncher()` now correctly detects and starts solving the game; blocked one key further in
+
+**Date:** 2026-08-26 · **Related task:** EL-18 follow-on · **Status:** 🚫 BLOCKED — genuine next data gap, stopped here (not a code defect)
+
+**Execution Record**
+- With `letterLauncher`/`fuelLabel` in place, `isOnLetterLauncher()` correctly matched live and
+  `completeLetterLauncher()` (the actual solver, not just detection) started running — real
+  progress past EL-18's point.
+- Failed inside the solver's `launcherState()` (`FoundationPage.ts` ~line 1081), which builds
+  `launcherChrome` — a regex of UI-chrome words to EXCLUDE when scraping the Letter Launcher's
+  shown-letter/word prompt, via `copyWordsAlt(['letterLauncher', 'memoryChallenge', 'fuelLabel',
+  'progressLabel', 'loading'], lang)`. `copyWordsAlt`, like `copyAlt`, requires every listed key to
+  resolve — `memoryChallenge` is still unpopulated, so the whole exclusion-word build throws, even
+  though the Letter Launcher screen itself never shows "Memory Challenge" text at all.
+- **User directed continuing** (checkpoint question, chose "keep pushing into Memory Challenge"
+  over pausing) — see [Execution Log, EL-20](#execution-log) for the `launcherChrome` fix that
+  unblocked this.
+
+---
+
+### EL-20 — `launcherChrome` made tolerant of individual missing words; Letter Launcher fully solved live
+
+**Date:** 2026-08-26 · **Related task:** EL-19 follow-on, user-directed · **Status:** ✅ DONE — Letter Launcher (LL) completed live in Hindi
+
+**Fix** (`FoundationPage.ts`, `launcherChrome`): per EL-19's own note, made this defensive
+exclusion-word list tolerant of individual missing keys instead of requiring all five up front —
+built the same way `copyWords`/`copyWordsAlt` do (split each resolved key into words, dedupe,
+escape) but per-key wrapped in `try/catch`, so a still-unobserved `memoryChallenge` just means one
+fewer word excluded, not a blocked solver. Justified because Letter Launcher's screen never shows
+"Memory Challenge" text at all (confirmed by every screenshot so far) — this is precautionary
+exclusion, not primary detection. Removed the now-unused `copyWordsAlt` import. `tsc`/`eslint`
+clean.
+
+**Result — attempt 8: real, substantial progress.** `completeLetterLauncher()` ran its full solve
+loop and actually finished: `done: StartF3 LL`. This is the first confirmed live-solved Hindi F3
+game. Landed on a celebration screen ("अरे वाह! आपने सब सही किया!" / "Oh wow! You got everything
+right!", 3 stars) and got stuck there — see EL-21.
+
+### EL-21 — Celebration screen's "Continue" renders in fixed English; added as a low-priority fallback (same pattern as H-1/D-10)
+
+**Date:** 2026-08-26 · **Related task:** EL-20 follow-on · **Status:** ✅ DONE (fix applied) — re-run pending, see next entry
+
+**Diagnosis:** the post-Letter-Launcher celebration screen's advance button reads literally
+"→ Continue" in ENGLISH — screenshot confirms every other word on that screen is Hindi except this
+one button. `foundationTransitionPriority()`'s existing `K.continue` slot correctly resolves to
+the Hindi `continueLabel` value (`जारी रखें`, already observed elsewhere) — which doesn't match
+this English text, so no priority slot matched, and the geometric fallback in
+`clickChallengeAdvance()` also missed it (the button's y-position is above that fallback's search
+band). Same underlying pattern as two ALREADY-established findings (H-1/D-10: the mic-skip button
+and the help-language modal are both fixed-English app-shell chrome, not translated game content).
+
+**Fix** (`transitions.ts`, `foundationTransitionPriority`): added one more priority slot,
+`tryTransitionRe([K.continue], languageByCode('english'))`, checked LAST (after every
+language-specific slot, including Hindi's own working `continueLabel`) — so this only ever fires
+when nothing more specific matched, and doesn't change behavior for any screen where "Continue" is
+genuinely localized. `tsc --noEmit` clean.
+
+**Next steps:** re-run to confirm this clicks through, and see what F3 shows next (expected: either
+more Letter Launcher rounds, or the Memory Challenge screen — which would finally allow observing
+`memoryChallenge`'s real value and unblock `launcherChrome`'s remaining gap for good).
+
+### EL-22 — Attempt 9: all 8 Letter Launcher rounds solved live; reached and captured the real Memory Challenge screen; 4 more values observed
+
+**Date:** 2026-08-26 · **Related task:** EL-21 follow-on · **Status:** ✅ DONE — major milestone; Memory Challenge solving itself not yet attempted
+
+**Execution Record**
+- **Result: `done: StartF3 LL LL LL LL LL LL LL LL`** — the EL-21 fix worked; the driver clicked
+  through every post-round celebration screen and solved all 8 Letter Launcher sub-levels
+  end-to-end in Hindi (matching English's own `LL×8` pattern exactly — see EL-3/EL-16 for the
+  English baseline). Took 26 minutes; `completeF3()` itself never threw (the defer+catch fixes
+  from EL-18 held up under real, sustained use, not just one screen).
+- After the 8th round, the loop could not detect the next screen (Memory Challenge — still
+  unpopulated at the time) and exhausted `maxNodes` without throwing (by design — `completeF3`
+  just returns whatever it has when the loop ends). My OWN probe script's unguarded final
+  `isPastF3()` assertion then threw as INTENDED (`isPastF3()` is deliberately left throwing outside
+  `f3Position()`/`completeF3()`'s own internal guards — EL-17/18's fixes were scoped, not blanket).
+- **The resulting failure screenshot is the real Memory Challenge screen** — a genuine, valuable
+  capture, not a wasted failure: heading **"मेमोरी चैलेंज"** ("Memory Challenge"), a countdown
+  badge reading **"⏰ समय समाप्त!"** ("Time Up!"), an answer grid of Devanagari letter tiles, and
+  two readouts rendered in literal, unlocalized ENGLISH: **"Progress: 0/5"** and **"0 of 3
+  letters"** — the same "app-shell chrome isn't translated" pattern as EL-21's "Continue" and
+  H-1/D-10's mic-skip button/help-language modal.
+- **Added to `uiCopyData.ts` from this direct observation:** `memoryChallenge: 'मेमोरी चैलेंज'`,
+  `timeUp: 'समय समाप्त'` (punctuation excluded, matching this file's convention),
+  `progressLabel: 'Progress'` (literal — genuinely observed as unlocalized English, not a
+  placeholder), `lettersOfCount: 'of {n} letters'` (same). `tsc --noEmit` clean.
+- **Next steps:** re-run to confirm `isOnMemoryChallenge()` now detects this screen and
+  `completeMemoryChallenge()` can actually attempt to solve it — expected to need `checkSequence`
+  next (the submit button after selecting all letters, not yet visible in this capture since 0 of
+  3 letters had been picked).
+- **Still unpopulated:** `checkSequence`, `wordsPerMinute`, `wordsLearnt`, `startLevel` (the last
+  three remain unobservable until F3 completes end-to-end at least once).
+
+### EL-23 — Attempt 10: Memory Challenge solver engaged for real, selected all 3 letters, blocked on the submit button — observed via the accessibility tree, not a screenshot
+
+**Date:** 2026-08-26 · **Related task:** EL-22 follow-on · **Status:** ✅ DONE — 1 more real value added, exactly on schedule
+
+**Execution Record**
+- Result: 3 more Letter Launcher rounds (`LL LL LL`) then a genuine Memory Challenge attempt —
+  `completeMemoryChallenge()` correctly detected the screen, read and selected the memorized
+  sequence (3 letters: ई, ए, ग, per the answer-slot state), then threw exactly at the submit step:
+  `No 'hindi' UI copy for 'checkSequence'`.
+- **This time read from the Playwright error-context accessibility snapshot instead of the
+  (viewport-cropped) screenshot** — the submit button was cut off below the fold in the PNG, but
+  the a11y tree gives it unambiguously: `button "क्रम जाँचें"` (ref `f1e74`), plus independent
+  confirmation of `progressLabel`="Progress: 0/5" (EL-22's reading was correct).
+- **Added:** `checkSequence: 'क्रम जाँचें'` ("sequence" + "check"). `tsc --noEmit` clean.
+- **All 12 originally-identified F2/F3-only keys are now populated except three**:
+  `wordsPerMinute`, `wordsLearnt`, `startLevel` — the post-F3 "next phase" completion markers,
+  which can only be observed once F3 actually finishes end-to-end (the same chicken-and-egg EL-17
+  first flagged for `isPastF3()`).
+- **Next steps:** re-run — this could plausibly be the run that reaches F3 completion for the
+  first time, which would both prove F3 end-to-end AND finally make those last 3 keys observable.
+
+### EL-24 — F3 completed end-to-end live in Hindi for the first time; `wordsLearnt`/`startLevel` observed; `pastF3` made tolerant of the still-missing `wordsPerMinute`
+
+**Date:** 2026-08-26 · **Related task:** EL-23 follow-on · **Status:** ✅ DONE — F3 (TC-021/022 equivalent) genuinely complete in Hindi
+
+**Execution Record**
+- **Result: `done: StartF3 LL LL LL MC MC MC LL LL LL LL LL LL LL LL MC MC MC` — 18 games, both
+  full Letter Launcher + Memory Challenge cycles solved live**, matching English's own proven
+  two-cycle shape exactly (`LL×8 MC×3` twice — see EL-3/EL-16). This is the first time F3 has
+  been driven to genuine completion in Hindi.
+- Landed on the Mastery landing (the "next phase" journey map) and correctly stopped there — my
+  probe's own unguarded final `isPastF3()` assertion threw one signal short:
+  `No 'hindi' UI copy for 'wordsPerMinute'`. Screenshot + accessibility tree both confirm the real
+  screen: header "- सीखे गए शब्द" (Words Learnt, with a book icon and count), and a
+  "स्तर 1 शुरू करें" (Start Level 1) button with Level 1–4 milestones visible — i.e. genuinely
+  past F3, into Mastery territory, exactly where English lands too.
+- **Added:** `wordsLearnt: 'सीखे गए शब्द'`, `startLevel: 'स्तर'` (the distinguishing word only —
+  this key has no `{level}` template unlike `startFoundationLevel`, and it's just one of several
+  OR'd signals, so a single reliably-Mastery-specific word is enough).
+- **Also fixed `pastF3`'s definition** (`FoundationPage.ts`): it used a rigid `copyRe([...3 keys],
+  lang)`, which required ALL THREE to resolve — a real structural problem for a marker set that by
+  definition can only be observed by finishing F3 once, since 2 of 3 signals get observed before
+  the third often will be. Rebuilt using the SAME `optFrag`/`orNone` graceful-OR pattern already
+  used by its sibling markers (`pastApplyMarkers`, `applyCompletedMarkers`) — a language with 2 of
+  3 signals now detects "past F3" from those two instead of being blocked on the third. `tsc
+  --noEmit` clean.
+- **`wordsPerMinute` remains the one still-unobserved key** — not blocking Hindi F3 detection any
+  more (per the fix above), but not yet confirmed either. Would need either a further screen
+  (perhaps a stats view not yet visited) or can reasonably stay open since 2 signals already cover
+  "past F3" detection reliably.
+- **Session outcome: Hindi F2 (2 Applies, a real content difference — EL-16) and Hindi F3 (18
+  games, both mechanics, completed end-to-end) are now both live-proven working**, via the
+  dynamic-user path, starting from H12's confirmed fix through 24 execution-log entries, 8 real
+  code defects/gaps fixed, and 10 real Hindi strings observed and recorded — none guessed or
+  translated.
+- **Final confirmation run:** re-resumed the same account once more, no code changes. Result:
+  `position after resume: past`, PASSED in 32s — the fixed `pastF3` detection correctly recognised
+  the already-completed state instantly, no re-driving needed. Report:
+  `tta-report/report_20260826_180949.html`.
+
+### EL-25 — Tooling: `--full-e2e` flag + `npm run e2e:full:*` scripts, after a real output-directory collision cost a lost screenshot
+
+**Date:** 2026-08-26 · **Related task:** user-directed, post-EL-24 · **Status:** ✅ DONE
+
+**Context:** attempting one final side-by-side English + Hindi `FULL_E2E` confirmation, both
+invoked with the default `test-results/` output directory, running concurrently. Playwright wipes
+that directory at the start of every run — the second run to start deleted the first's
+in-progress screenshot, so a genuine (later confirmed transient/environmental — UAT was
+redeploying repeatedly during this window, see the "Couldn't connect" screenshots and 3 reconnect
+events both language runs hit independently) failure had no visual evidence to inspect.
+
+**Fix, made reusable rather than one-off:**
+- `scripts/run-e2e.js`: added a `--full-e2e` flag translating to `FULL_E2E=1`, matching the
+  existing `--env`/`--lang` translation pattern (kept as a flag, not a raw env var prefix, for the
+  same cross-platform reason those are — `FULL_E2E=1 node …` isn't valid PowerShell/cmd syntax).
+- `scripts/run-full-e2e-parallel.js` (new): spawns the English and Hindi `FULL_E2E` runs
+  side by side from Node directly — genuinely cross-platform, unlike `a & b` (a PowerShell syntax
+  error; runs sequentially, not in parallel, in cmd.exe). Each run gets its own isolated
+  `--output` directory and its own log file, with live output tagged `[english]`/`[hindi]`.
+- `package.json`: `e2e:full:english`, `e2e:full:hindi` (+ `:headed` variants, each with its own
+  isolated `--output`), and `e2e:full:both` (+ `:headed`) wired to the new parallel script.
+- `.gitignore`: added `test-results-full-*/` (the new isolated output dirs) and confirmed `*.log`
+  already covers the new log files.
+- README.md: new "Full end-to-end confirmation (`FULL_E2E`)" subsection under Environment
+  Execution Guide, documenting the commands and explaining the output-directory collision risk
+  directly, so the next person doesn't lose evidence the same way.
+- Verified: `node -c` clean on both scripts, `package.json` valid JSON, and a live
+  `--full-e2e --help` smoke test confirms the flag translates correctly (`FULL_E2E=on` in the
+  banner) without hitting the network.
+
 ---
 
 ## Open TODOs
@@ -2319,9 +2846,27 @@ Game"/"level" while its "How to Play" heading is correct Hindi ([Decisions Log, 
 [Execution Log, EL-12](#execution-log)). Per the user's explicit decision, this is NOT being routed around —
 H12 stays blocked until the app's content is fixed.
 
-Current focus: **Hindi → Discovery + F1 (TC-001–019). F2/F3 explicitly deferred until Discovery+F1
-are complete, stable and verified.** Full task table, TC coverage mapping, English-vs-Hindi
-differences, and file-level change plan: [Readiness Plan, Phase 4](#phase-4--hindi-discovery--f1).
+**Update 2026-08-26 (see [Decisions Log, D-14](#decisions-log)):** H12 confirmed fixed by the app
+team. Hindi Discovery+F1 (TC-001–019) is now live-reconfirmed PASSING end-to-end
+([Execution Log, EL-13](#execution-log)). Current focus has moved to **Hindi F2 (TC-020) / F3
+(TC-021/022)** — no longer deferred. F2/F3 have no parked Hindi account, so they're reached only
+via the dynamic-user `FULL_E2E=1` path (same account walks Discovery→F1→F2→F3 in one session).
+Progress is tracked key-by-key against the 12 F2/F3-only `uiCopyData.ts` entries that were
+English-only as of 2026-08-26 (`letterRecognition` closed same-day via a reused EL-12 observation;
+`letterLauncher`, `memoryChallenge`, `checkSequence`, `timeUp`, `wordsPerMinute`, `wordsLearnt`,
+`startLevel`, `lettersOfCount`, `fuelLabel`, `progressLabel`, `loading` remain open, not yet
+reached) — see EL-13 for the live-run methodology. A second, unrelated defect (`nextOrContinueExact`
+throwing instead of falling back, same shape as D-12) was also found and fixed live, EL-14. **Live
+Hindi F2 now reaches and completes A1 and A2** (word-recognition practice, feedback, answer
+selection all confirmed working in Hindi) but then lands on what looks like an F3 screen instead of
+an F2 A3 entry — a genuinely open question (content difference vs. detection gap), deliberately
+NOT resolved by guessing; see [Execution Log, EL-15](#execution-log) for the full evidence and the
+decision this needs from here.
+
+Previous focus (superseded, kept for history): **Hindi → Discovery + F1 (TC-001–019). F2/F3
+explicitly deferred until Discovery+F1 are complete, stable and verified.** Full task table, TC
+coverage mapping, English-vs-Hindi differences, and file-level change plan:
+[Readiness Plan, Phase 4](#phase-4--hindi-discovery--f1).
 
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
