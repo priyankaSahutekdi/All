@@ -1,5 +1,5 @@
 import { test, expect } from '../../fixtures/appTest';
-import { FoundationPage } from '../../pages/foundation/FoundationPage';
+import { FoundationPage } from '../../pages/foundation';
 import { resumeParkedAccount } from '../../utils/sessionResume';
 
 /**
@@ -66,7 +66,7 @@ test.describe('@P0 @Foundation F3 series (single session, F3 account)', () => {
                     + 'This is ACCOUNT STATE, not a code failure: nothing here is broken, but F3 is '
                     + 'NOT being tested. Fix by re-parking a fresh F3-positioned account as '
                     + 'accounts.f3, or by covering F3 through the dynamic-user E2E '
-                    + '(FULL_E2E=1 in discovery-e2e.spec.ts), which walks a new user F1→F2→F3.';
+                    + '(FULL_E2E=1 in foundation-f1.spec.ts), which walks a new user F1→F2→F3.';
                 if (process.env.ALLOW_STALE_F3 !== '1') {
                     throw new Error(`F3 coverage has lapsed. ${detail} `
                         + 'Set ALLOW_STALE_F3=1 to acknowledge this and skip instead of failing.');

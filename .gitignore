@@ -6,6 +6,7 @@ dist/
 
 # Test results
 test-results/
+test-results-full-*/
 playwright-report/
 playwright/.cache/
 

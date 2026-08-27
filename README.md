@@ -560,6 +560,50 @@ npm run e2e -- --env=uat --headed --regression
 > design), so they execute together, not as isolable per-TC runs. F2/F3/M4/S1 are separate
 > specs and can be run individually by file path (as shown above).
 
+### Full end-to-end confirmation (`FULL_E2E`) — one fresh user, Discovery → F1 → F2 → F3
+
+`foundation-f1.spec.ts` has an opt-in continuation (off by default, so the standard regression
+baseline is unchanged) that keeps the SAME fresh guest account, in the SAME browser session,
+going straight through F2 → F3 (→ Mastery, gated) after finishing F1 — instead of the separate
+parked-account specs (`foundation-f2`/`foundation-f3`, which resume a dedicated `Testf2auto`/
+`Testf3auto` account and drift forward-only). This is the strongest single-command proof that the
+whole Foundation journey works for a real, brand-new user.
+
+```bash
+# English, one command:
+npm run e2e:full:english
+
+# Hindi, one command:
+npm run e2e:full:hindi
+
+# Both languages, genuinely in parallel, one command:
+npm run e2e:full:both
+
+# Any of the above, headed:
+npm run e2e:full:english:headed
+npm run e2e:full:hindi:headed
+npm run e2e:full:both:headed
+
+# Generic form (any language/env), via the runner directly:
+node scripts/run-e2e.js --full-e2e --lang=<english|hindi> --env=<uat|lab|lab2> src/tests/discovery/foundation-f1.spec.ts --output=<dir>
+```
+
+> **Why `--output=<dir>` matters if you ever run two of these at once by hand:** Playwright wipes
+> its `test-results` output directory at the START of every run. Two runs sharing the default
+> directory will delete each other's screenshots/traces/videos out from under one another —
+> confirmed live (2026-08-26): a real failure screenshot was silently lost this way when a second
+> run started while the first was still going. `e2e:full:english`/`e2e:full:hindi` already pass
+> their own isolated `--output=test-results-full-<lang>`, so plain parallel terminals are safe;
+> only add your own `--output` if you invoke `run-e2e.js --full-e2e` directly with a different
+> spec/target. `e2e:full:both` (`scripts/run-full-e2e-parallel.js`) handles this automatically and
+> is genuinely cross-platform — it spawns both runs from Node rather than relying on `&`, which is
+> a syntax error in PowerShell and runs SEQUENTIALLY (not in parallel) in cmd.exe.
+>
+> Each run can take 30–90 minutes depending on server load (it drives the full Foundation journey,
+> not a single TC). `e2e:full:both` streams both runs' output live, tagged `[english]`/`[hindi]`,
+> and also logs each to its own file (`full-e2e-english.log`/`full-e2e-hindi.log`, gitignored) for
+> later review.
+
 ## Execution Commands
 
 ### Basic Execution

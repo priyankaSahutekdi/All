@@ -117,13 +117,22 @@ test.describe('@P0 @Foundation F1 series (single session, single login)', () => 
         // FOUNDATION (Discovery → F1 → F2 → F3) with one user.
         // =====================================================================
         if (process.env.FULL_E2E) {
-            await test.step('E2E-F2 (TC-020): same user → Start F2 → complete A1 → A2 → A3', async () => {
+            await test.step('E2E-F2 (TC-020): same user → Start F2 → complete A1 → A2 (→ A3 if present)', async () => {
                 await foundation.dismissCoachmarks().catch(() => {});
                 await expect(foundation.startFoundationButton()).toBeVisible({ timeout: 20000 });
                 const n1 = await foundation.completeFoundationThroughApply(1);        // Start F2 → A1
                 console.log(`[E2E-F2] nodes (→A1): ${n1.join(' ')}`);
-                const n2 = await foundation.completeFoundationThroughApply(2, 2);     // A2, then A3
-                console.log(`[E2E-F2] nodes (A2→A3): ${n2.join(' ')}`);
+                // F2's Apply count is a genuine, live-confirmed content difference between
+                // languages, not a framework assumption: English has 3 Applies (A1/A2/A3);
+                // Hindi has only 2 (A1/A2) — after A2, Hindi's F2 is already done and the
+                // account is on the "Start F3" screen (confirmed independently 3 times —
+                // docs/HINDI_ROLLOUT_LOG.md EL-15/EL-16/this run). Targeting a 3rd Apply that
+                // doesn't exist made the driver wander into unrecognised F3 content instead of
+                // stopping cleanly. Add the next language's real count here once confirmed,
+                // rather than assuming it matches either existing value.
+                const remainingApplies = lang.code === 'hindi' ? 1 : 2;
+                const n2 = await foundation.completeFoundationThroughApply(remainingApplies, 2);
+                console.log(`[E2E-F2] nodes (${remainingApplies === 1 ? 'A2' : 'A2→A3'}): ${n2.join(' ')}`);
                 await foundation.expectFoundationApplyCompleted();                    // F2 done → "Start F3"
             });
 
