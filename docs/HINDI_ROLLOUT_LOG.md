@@ -2808,9 +2808,48 @@ events both language runs hit independently) failure had no visual evidence to i
   `--full-e2e --help` smoke test confirms the flag translates correctly (`FULL_E2E=on` in the
   banner) without hitting the network.
 
----
+### EL-26 — Full bilingual regression: `npm run e2e:full:both` used for real, found and fixed a real account-collision bug, then both languages passed end to end
 
-## Open TODOs
+**Date:** 2026-08-27 · **Related task:** first real use of EL-25's tooling, user-directed · **Status:** ✅ DONE — both languages green
+
+**Execution Record**
+- **First attempt, `npm run e2e:full:both`:** English PASSED clean (64m02s, full Discovery→F1→F2
+  (3 Applies)→F3 (`LL×8 MC×3` twice)→Mastery gate). Hindi FAILED in 36s — the account never got
+  past a blank login screen.
+- **Root cause:** `DiscoveryHelper.generateUniqueUsername()` was `testuser_${Date.now()}` — no
+  protection against two SEPARATE processes computing the timestamp in the same millisecond.
+  `run-full-e2e-parallel.js` launches both languages via `Promise.all`, so this collision, latent
+  since the helper was written, became near-certain the first time true parallel execution was
+  ever used. Both processes generated identical usernames and collided on one real account. Fixed
+  by the user directly (commit `db3625a`): username now includes `process.pid` + a random suffix.
+- **Second attempt (Hindi alone, with the fix):** got much further (F1 complete, into F2) before
+  failing again — this time on the ALREADY-KNOWN EL-15/EL-16 finding (Hindi F2 has 2 Applies, not
+  3), because `foundation-f1.spec.ts`'s `FULL_E2E` continuation still had English's count
+  hardcoded. This was the open scope decision flagged in EL-16 and never resolved — hitting the
+  "official" regression pipeline is what finally forced the decision.
+- **Decision (user, asked directly):** make the Apply count language-aware rather than treat it as
+  an app bug to report. Implemented: `remainingApplies = lang.code === 'hindi' ? 1 : 2` in the
+  `E2E-F2` step, with a comment recording the reasoning and citing EL-15/EL-16 (commit `0767cd3`).
+  English's behavior is byte-for-byte unchanged (still resolves to 2).
+- **Third attempt (Hindi alone, both fixes in place): ✅ PASSED, 54m59s.** Full
+  Discovery→F1→F2 (2 Applies: `StartF P P P A1`, `P P P A2`)→F3 (`StartF3 LL×8 MC` — 9 games)→
+  Mastery gate (landed on a "अगला स्तर" / "Next Level" congratulatory screen rather than a
+  bare "Start Level 1" button; the M4 gate check correctly still reported GATED either way, since
+  neither screen shows `startLevelButton(4)`). Report: `tta-report/report_20260827_094007.html`.
+  English was not re-run for this attempt — the Apply-count fix provably doesn't change its code
+  path.
+- **Net result: both languages pass the full continuous single-session Foundation journey, live,
+  on the real app, independently confirmed.** This closes out the F2/F3 Hindi work opened in
+  EL-13 — every one of the 12 originally-identified F2/F3 `uiCopyData.ts` gaps is resolved except
+  `wordsPerMinute` (still unobserved, no longer blocking per EL-24's `pastF3` fix), Hindi's F2
+  Apply-count difference is now an accepted, coded-for fact rather than an open question, and the
+  account-collision bug the new parallel tooling surfaced is fixed for every future language too.
+- **Also observed, not yet explained:** this run's F3 only needed 1 Memory Challenge round (`MC`
+  once) to clear, versus the 3 rounds (`MC×3`, twice) every prior run tonight showed — including
+  this SAME account's own earlier Letter Launcher-only cycle. Not investigated — plausibly per-run
+  randomness in how many rounds satisfy the fuel/progress target, but unconfirmed, and no English
+  run has yet shown anything other than 3. Flagged rather than silently assumed, in case a future
+  run makes a pattern visible.
 
 **Flat and ordered. No history, no evidence — that lives in the [Readiness Plan](#readiness-plan) (task
 detail) and [Execution Log](#execution-log) (run history).** Check items off here; update the linked
