@@ -179,6 +179,12 @@ export async function runDiscoveryFlow(
             const txt = await recordCurrentItem(true);
             console.log(`[${label}] item ${i + 1}: "${txt}"`);
             if (await completionVisible()) return;
+            // On last iteration, debug: show what page text looks like for completion detection
+            if (i === maxItems - 1) {
+                const pageText = await page.locator('body').textContent();
+                console.log(`[${label}] DEBUG: Last iteration - checking page for completion pattern. Pattern: ${completionPopupRe()}`);
+                console.log(`[${label}] DEBUG: Page text sample (first 500 chars): ${pageText?.substring(0, 500)}`);
+            }
             // advance to next item
             await assess.clickNext().catch(() => {});
             await page.waitForTimeout(2500);
