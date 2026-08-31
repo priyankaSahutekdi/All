@@ -298,7 +298,8 @@ export async function runDiscoveryFlow(
     });
 
     await test.step('TC-009: Complete Assessment 1 → Continue', async () => {
-        await completeUntilPopup('Assessment 1');
+        // Nepali may have different assessment length - allow up to 50 items instead of 20
+        await completeUntilPopup('Assessment 1', lang.code === 'nepali' ? 50 : 20);
         await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
         // Asserted, not discarded: a silently-failed Continue click would leave this popup on
         // screen, and completeUntilPopup('Assessment 2')'s first completionVisible() check would
@@ -312,7 +313,8 @@ export async function runDiscoveryFlow(
 
     await test.step('TC-010: Complete Assessment 2 → Continue', async () => {
         await leaveDemoIfPresent();
-        await completeUntilPopup('Assessment 2');
+        // Nepali may have different assessment length - allow up to 50 items instead of 20
+        await completeUntilPopup('Assessment 2', lang.code === 'nepali' ? 50 : 20);
         await expect(assess.completionPopup()).toBeVisible({ timeout: 10000 });
         const continued = await clickByText(continueExact(), 8000);
         expect(continued, 'Assessment 2 completion Continue button should be present').toBeTruthy();

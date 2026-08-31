@@ -73,7 +73,7 @@ export const UI_COPY = {
      * never re-confirmed it. **Re-verified live 2026-08-19 (H11)**: the Assessment 1 completion
      * popup's own CTA reads exactly "जारी रखें". P2-15 closed.
      */
-    continueLabel: { english: 'Continue', hindi: 'जारी रखें' },
+    continueLabel: { english: 'Continue', hindi: 'जारी रखें', nepali: 'जारी राख्नुहोस्' },
     next: { english: 'Next' },
     // hindi observed live, H12 (2026-08-20): the post-A1-Apply celebration screen ("अरे वाह!
     // आपने सब सही किया! अगला स्तर 🦉 मुझे आप पर बहुत गर्व है! ऐसे ही जारी रखो!") — "अगला स्तर"
