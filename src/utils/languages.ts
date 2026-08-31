@@ -35,6 +35,7 @@ export interface AppLanguage {
 export const LANGUAGES: AppLanguage[] = [
     { code: 'english', label: 'English' },
     { code: 'hindi', label: 'हिंदी', aliases: ['Hindi'] },
+    { code: 'nepali', label: 'नेपाली', aliases: ['Nepali'] },
     { code: 'tamil', label: 'தமிழ்', aliases: ['Tamil'] },
     { code: 'telugu', label: 'తెలుగు', aliases: ['Telugu'] },
     { code: 'kannada', label: 'ಕನ್ನಡ', aliases: ['Kannada'] },

@@ -57,10 +57,10 @@ export const UI_COPY = {
      * fixed English for the same reason as `skip` above and is matched via a hardcoded literal
      * at its own call site instead of this key. See `HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10.
      */
-    confirm: { english: 'Confirm', hindi: 'कन्फर्म करें' },
+    confirm: { english: 'Confirm', hindi: 'कन्फर्म करें', nepali: 'पुष्टि गर्नुहोस्' },
     /** English-only — TC-002's help-language popup renders fixed English; see `confirm` above. */
     chooseHelpLanguage: { english: 'Choose your help language' },
-    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें' },
+    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें', nepali: 'मूल्याइन सुरु गर्नुहोस्' },
     letsStart: { english: "Let's Start" },
 
     // ── Transition / advance controls ────────────────────────────────────────
@@ -84,8 +84,8 @@ export const UI_COPY = {
     // one concept depending on screen — 'खेल शुरू करें' (practice-demo entry, confirmed H11/H5)
     // and 'गेम शुरू करें' (Apply-challenge entry, "गेम" is the English loanword). Both are real,
     // both are needed — `copy()` already supports multiple literals per language (an array).
-    startGame: { english: 'Start Game', hindi: ['खेल शुरू करें', 'गेम शुरू करें'] },
-    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', },
+    startGame: { english: 'Start Game', hindi: ['खेल शुरू करें', 'गेम शुरू करें'], nepali: 'खेल सुरू गर्नुहोस्' },
+    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', nepali: 'डेमो छोड़नुहोस्' },
     claim: { english: 'Claim' },
     collect: { english: 'Collect' },
     finish: { english: 'Finish' },
@@ -121,7 +121,7 @@ export const UI_COPY = {
     foundationWord: { english: 'Foundation' },
 
     // ── Activity identification ─────────────────────────────────────────────
-    howToPlay: { english: 'How to Play', hindi: 'कैसे खेलें' },
+    howToPlay: { english: 'How to Play', hindi: 'कैसे खेलें', nepali: 'कसरी खेल्ने' },
     // hindi observed live, EL-17 (2026-08-26): F3's Letter Launcher game heading read exactly
     // "अक्षर लॉन्चर ईंधन: 0 / 50" above a shown letter + ✓/✗ buttons — "अक्षर लॉन्चर" is this
     // key; "ईंधन" is `fuelLabel` below (screenshot: test-results/f3-unrecognised.png).
