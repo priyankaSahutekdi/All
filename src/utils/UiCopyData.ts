@@ -85,7 +85,7 @@ export const UI_COPY = {
     // and 'गेम शुरू करें' (Apply-challenge entry, "गेम" is the English loanword). Both are real,
     // both are needed — `copy()` already supports multiple literals per language (an array).
     startGame: { english: 'Start Game', hindi: ['खेल शुरू करें', 'गेम शुरू करें'], nepali: 'खेल सुरू गर्नुहोस्' },
-    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', nepali: 'डेमो छोड़नुहोस्' },
+    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', nepali: 'डेमो छोड्नुहोस्' },
     claim: { english: 'Claim' },
     collect: { english: 'Collect' },
     finish: { english: 'Finish' },
@@ -208,7 +208,10 @@ export const UI_COPY = {
      * completions, the Letter-Hunt-fail result screen) — NOT yet confirmed those screens render
      * the same "शाबाश!!!"; H12/H10 must re-verify before relying on it there.
      */
-    hurray: { english: 'Hurray', hindi: 'शाबाश!!!', nepali: 'वाह!!!' },
+    // nepali observed live 2026-08-31 on the Assessment 1 completion popup, whose three lines read
+    // "हुर्रे!!!" / "तपाईंले सफलतापूर्वक मूल्याङ्कन पूरा गर्नुभयो" / "जारी राख्नुहोस्" (the last is
+    // `continueLabel`, confirmed correct by TC-009/TC-010 clicking it successfully).
+    hurray: { english: 'Hurray', hindi: 'शाबाश!!!', nepali: 'हुर्रे!!!' },
     successfully: { english: 'successfully', nepali: 'सफलतापूर्वक' },
     complete: { english: 'complete', nepali: 'पूरा' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
@@ -226,7 +229,7 @@ export const UI_COPY = {
      * are driven by the same `completeUntilPopup`/`AssessmentPage.completionPopup` code path).
      * Used only here — no cross-screen reuse risk like `hurray` above.
      */
-    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है', nepali: 'सफलतापूर्वक पूरा गरे' },
+    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है', nepali: 'सफलतापूर्वक मूल्याङ्कन पूरा' },
     completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट', nepali: 'मूल्याङ्कन पूरा' },
 
     // ── Errors ──────────────────────────────────────────────────────────────
