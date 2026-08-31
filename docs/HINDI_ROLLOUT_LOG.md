@@ -2970,6 +2970,24 @@ while UAT answered in 72 ms and no stray processes existed. The machine idled an
 was throttled. **Disable sleep/idle throttling before any long unattended run**, and treat
 uniform multi-hundred-× step inflation as an environment signal, never a code one.
 
+
+**⚠️ UAT guest-login outage, same session (~20:10 IST onward).** After the regression above
+completed, every run — **English and Nepali alike** — began failing at TC-001 in a consistent
+~84 s with the post-login landing never appearing. The login form is filled correctly (User ID,
+Password, Grade 2 selected, "Login as Guest" present, no error toast) and the page simply stays
+on the login screen. UAT's root URL answers in <150 ms throughout, and English had passed TC-001
+forty minutes earlier on this same commit, so this is **environment-side, not a code regression** —
+consistent with the UAT instability already recorded in EL-25. Anything that fails at TC-001 with
+this signature should be treated as an outage, not debugged as a test defect.
+
+**Observed but UNVERIFIED (revisit when UAT recovers):** during that window a failure snapshot
+showed the login form's User ID field containing `testuser1788…` while the Password field held
+`testuser_1788…` — i.e. the User ID input had stripped the `_` separators, breaking
+`DiscoveryHelper`'s own `password === username` contract. `generateUniqueUsername()` was changed
+to emit an alphanumeric id with no separators, which is strictly safer against input filtering.
+**This did NOT resolve the outage** (English and Nepali both still fail at TC-001 with matching
+fields), so it is hardening against a real observed inconsistency, *not* a validated fix, and it
+has not been exercised against a healthy UAT.
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
 **Status: ✅ COMPLETE & VERIFIED (2026-08-19)**
