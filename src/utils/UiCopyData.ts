@@ -60,7 +60,7 @@ export const UI_COPY = {
     confirm: { english: 'Confirm', hindi: 'कन्फर्म करें', nepali: 'पुष्टि गर्नुहोस्' },
     /** English-only — TC-002's help-language popup renders fixed English; see `confirm` above. */
     chooseHelpLanguage: { english: 'Choose your help language' },
-    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें', nepali: 'मूल्याइन सुरु गर्नुहोस्' },
+    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें', nepali: 'मूल्याङ्कन सुरु गर्नुहोस्' },
     letsStart: { english: "Let's Start" },
 
     // ── Transition / advance controls ────────────────────────────────────────
@@ -208,9 +208,9 @@ export const UI_COPY = {
      * completions, the Letter-Hunt-fail result screen) — NOT yet confirmed those screens render
      * the same "शाबाश!!!"; H12/H10 must re-verify before relying on it there.
      */
-    hurray: { english: 'Hurray', hindi: 'शाबाश!!!' },
-    successfully: { english: 'successfully' },
-    complete: { english: 'complete' },
+    hurray: { english: 'Hurray', hindi: 'शाबाश!!!', nepali: 'वाह!!!' },
+    successfully: { english: 'successfully', nepali: 'सफलतापूर्वक' },
+    complete: { english: 'complete', nepali: 'पूरा' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
     congratulations: { english: 'congrat' },
     /**
@@ -226,8 +226,8 @@ export const UI_COPY = {
      * are driven by the same `completeUntilPopup`/`AssessmentPage.completionPopup` code path).
      * Used only here — no cross-screen reuse risk like `hurray` above.
      */
-    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है' },
-    completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट' },
+    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है', nepali: 'सफलतापूर्वक पूरा गरे' },
+    completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट', nepali: 'मूल्याङ्कन पूरा' },
 
     // ── Errors ──────────────────────────────────────────────────────────────
     couldntConnect: { english: "Couldn't connect right now" },

@@ -226,7 +226,8 @@ export async function runDiscoveryFlow(
         // run's language. Asserted via the same header read switchToLanguage verifies with.
         await foundation.expectAppInLanguage(lang);
         // …and the assessment landing is reachable.
-        await expect(page.getByText(copy('startAssessment', lang)[0], { exact: true }).first())
+        // Use regex pattern (copyRe) instead of exact match to handle Unicode rendering variations
+        await expect(page.getByText(copyRe('startAssessment', lang)).first())
             .toBeVisible({ timeout: 15000 });
     });
 
