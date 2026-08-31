@@ -2907,6 +2907,69 @@ explicitly deferred until Discovery+F1 are complete, stable and verified.** Full
 coverage mapping, English-vs-Hindi differences, and file-level change plan:
 [Readiness Plan, Phase 4](#phase-4--hindi-discovery--f1).
 
+### EL-27 — Nepali onboarding: TC-001–011 live, two Devanagari codepoint bugs, and the full F1–F3 copy gap enumerated statically
+
+**Date:** 2026-08-31 · **Related task:** user-directed Nepali onboarding · **Status:** 🚧 IN PROGRESS (TC-001–011 PASS; TC-012 blocked on observation)
+
+**Result:** Nepali `FULL_E2E` reaches **TC-001–TC-011 passing live** (Discovery through the Letter
+Hunt demo skip). TC-012 stops on `No 'nepali' UI copy for 'learningJourney'` — a real, expected
+observation gap, not a defect.
+
+**Two bugs of the same class — Devanagari codepoints that look identical but are not:**
+
+| key | had | app renders | difference |
+|---|---|---|---|
+| `startGame` | `खेल सुरु गर्नुहोस्` | `खेल सुरू गर्नुहोस्` | U+0941 vs U+0942 |
+| `skipDemo` | `डेमो छोड़नुहोस्` | `डेमो छोड्नुहोस्` | U+093C NUKTA vs U+094D VIRAMA |
+
+Both were hand-transcribed, and both cost a full debug cycle. `skipDemo` hid until TC-011 because
+TC-004 leaves the demo via *Start Game*, not *Skip Demo*, so the string was never exercised.
+
+**Method change adopted:** observed strings are now extracted **programmatically from the failure
+snapshot's bytes** and substituted into `UiCopyData.ts` by script — never retyped. Verified at
+codepoint level before committing. Retyping Devanagari is not a reliable transcription channel.
+
+**Two values had been GUESSED**, violating this file's own observed-never-translated rule:
+`hurray` (`वाह!!!` → observed `हुर्रे!!!`) and `successfullyCompleted`. TC-009/TC-010 passed anyway
+**only by luck** — `completedAssessment` (`मूल्याङ्कन पूरा`) happened to substring-match the real
+popup, masking both wrong values. A passing test did not mean the data was right.
+
+**The remaining gap was enumerated statically, not discovered one timeout at a time.**
+`missingCopyKeys()` (uiCopyLookup.ts) reports Nepali missing 46 keys and Hindi missing 30 — yet
+Hindi completes F1–F3, so most gaps are English-by-design or off-path. Subtracting gives the
+**18 keys that actually block Nepali TC-013–022**: `nextLevel`, `learningJourney`, `languageSkills`,
+`startFoundationLevel`, `startLevel`, `letterLauncher`, `memoryChallenge`, `letterRecognition`,
+`readyForChallenge`, `fuelLabel`, `progressLabel`, `wordsLearnt`, `lettersOfCount`, `timeUp`,
+`checkSequence`, `correct`, `great`, `wellDone`. Seconds of static analysis replaced hours of
+run-fail-add-rerun. **Use this before starting any future language.**
+
+Note the chicken-and-egg for these: `copy()` resolves at the top of a step, so the run throws at
+1ms and the failure snapshot shows the *previous* screen. The string needed to recognise a screen
+cannot be harvested until that screen is reachable — hence the `_*-observation-probe.spec.ts`
+pattern. Closing all 18 requires driving Nepali through the placement screen, F1 L1–L9/A1–A3, F2,
+and F3's Letter Launcher / Memory Challenge.
+
+**Regression (`npm run e2e:full:both`, English + Hindi):** to fix Nepali, four `AssessmentPage`
+locators were loosened from `getByText(label, {exact:true})` to `getByText(copyRe(...))` — a
+behaviour change for **every** language, not just Nepali (English `confirm` went from exact-match
+to `/(?:Confirm)/i`, which also matches "Confirmation"). **Discovery TC-001–012 passed 12/12 in
+both English and Hindi**, exercising all four changed locators — no regression from the change.
+English then went on to pass all of F1 (TC-013–019).
+
+Both runs did fail deeper — English at TC-020 (F2), Hindi at TC-019 (A3 Apply) — in solver code
+untouched by this work. English's failure text is the app's own *"Couldn't connect right now /
+Please check your internet connection"* preceded by three `[Foundation] ✅ reconnected` events:
+the identical signature [EL-25](#execution-log) already recorded as transient/environmental UAT
+instability. Not re-confirmed sequentially this session; treat as unproven-but-consistent with
+that precedent rather than as a clean pass.
+
+**Environment trap worth knowing:** one unattended 69-minute Nepali run failed on
+`img[alt="Play"]` — a fixed-English, language-independent locator that passed in four runs either
+side of it. Per-step timings were inflated ~400× (TC-005 4.2s → 25m 44s; TC-006 3.7s → 35m 7s)
+while UAT answered in 72 ms and no stray processes existed. The machine idled and headless Chrome
+was throttled. **Disable sleep/idle throttling before any long unattended run**, and treat
+uniform multi-hundred-× step inflation as an environment signal, never a code one.
+
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
 **Status: ✅ COMPLETE & VERIFIED (2026-08-19)**
