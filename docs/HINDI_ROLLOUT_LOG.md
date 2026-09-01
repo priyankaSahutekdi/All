@@ -2988,6 +2988,75 @@ to emit an alphanumeric id with no separators, which is strictly safer against i
 **This did NOT resolve the outage** (English and Nepali both still fail at TC-001 with matching
 fields), so it is hardening against a real observed inconsistency, *not* a validated fix, and it
 has not been exercised against a healthy UAT.
+### EL-28 — Nepali TC-001–013 live, and three English-shaped assumptions in SHARED code that only a different language could expose
+
+**Date:** 2026-09-01 · **Related task:** user-directed "complete the rest of the Nepali test cases" · **Status:** 🚧 IN PROGRESS (TC-001–013 PASS; 17 keys + F1–F3 driving remain)
+
+Nepali now completes **all of Discovery plus the F1 landing (TC-001–TC-013)**, up from TC-001–008
+at the start of the session. Almost none of what blocked it was translation.
+
+**1. `trainProgress()` could not see a 10-item Letter Train.** It told a Letter Train apart from
+the practice/Apply screen by counter LENGTH — accept `X/16`, else any `X/Y` with `Y >= 11`, that
+threshold existing precisely to exclude the practice `/10`. **Nepali's L1 train is 10 items**, so it
+landed on the value the rule exists to reject. The counter was invisible, `completeLetterTrain`
+returned a FALSE `completed("train finished after 0 items")` for a train that had not started, and
+the failure surfaced 20 lines later as an unrelated P1 assertion. English logged 48 `[Letter Train]`
+progress lines for the same step; Nepali logged **zero** — that diff is what found it. Now falls
+back to a STRUCTURAL signal, `img[alt="train"]`, already trusted for this purpose by
+`dismissCoachmarks`. A numeric length heuristic cannot discriminate screens across languages.
+
+**2. The read-aloud window was a flat 2500ms.** Ample for "The cat is sleeping", far too short for a
+60-character Nepali sentence. The app rejects a recording that does not roughly cover the prompt,
+renders no Play/Retry/Next, and the item never advances. **This was misdiagnosed as intermittent app
+flakiness for most of a day.** It is deterministic on sentence LENGTH: Assessment 1 stalled
+reproducibly on its two longest sentences and passed the short ones, so it looked random only
+because it depended which sentences the assessment served. Now scales with the prompt
+(`length * 120ms`, clamped 2.5–12s). TC-009 went from failing ~1 run in 3 to passing in 31s.
+
+**3. A swallowed error cost 12–25 minutes per failure.** `clickNext().catch(() => {})` meant a Next
+that never landed spun the full 20 iterations and then reported *"completion popup not reached"* — a
+symptom on the wrong screen, which is exactly what sent this session hunting a missing completion
+translation that never existed. Now fails on the real signal (item text unchanged across
+consecutive recordings) and says so explicitly. Fixing the diagnostic BEFORE continuing to debug
+paid for itself on the very next run.
+
+All three are language-independent. English and Hindi were one long sentence, or one short train,
+away from the same failures.
+
+**Nepali-specific:** no `VOICE_CULTURE` entry, so F1's say-the-word screens would have fed the app
+the 46-byte silence `TtsHelper` rejects by design — F1+ could never have passed. Nepali now borrows
+the installed **hi-IN** voice (same Devanagari script). Measured on this runner with real Nepali
+text: en-US → 46 bytes (throws), hi-IN → 125326 bytes. Swap to `ne-NP` if such a voice is installed.
+
+**`startFoundationLevel` observed:** `{level} सुरु गर्नुहोस्` — and note it uses **U+0941** where
+`startGame` uses **U+0942**. The app genuinely spells "start" two ways on two screens; hand
+transcription would have silently normalised them and broken one. Extract from snapshot bytes.
+
+**GUESSED VALUES CAUSE FALSE POSITIVES, NOT JUST MISSES.** Two Nepali values invented earlier in
+this session (`successfully`, `complete`) were reverted. Supplying them switched ON
+`FoundationPage`'s `completion` check, which Hindi deliberately runs with DISABLED (`tryCopyRe`
+returns `null` on partial coverage), and `'पूरा'` is generic enough to match almost any screen —
+making a node look complete when it was not. Absent is the SAFE state; the framework is built for
+it. This is the third time a guess cost a debug cycle this session.
+
+**Harvest technique that worked:** temporarily fill each unobserved key with a sentinel that can
+never match real text (working tree only, never committed). `copy()` then resolves, the run walks
+into each screen, the sentinel fails THERE, and the failure snapshot hands over the real string —
+sidestepping the chicken-and-egg where a key needed to RECOGNISE a screen cannot be read until the
+screen is reachable. Regenerate with the `missingCopyKeys` diff from EL-27.
+
+**Regression:** English re-run after all three shared fixes — **TC-001 through TC-020 (F2) PASS**,
+483 `[Letter Train]` lines, exceeding the 2026-08-31 baseline where TC-020 failed. F3 was
+INCONCLUSIVE: the harness's own 50-minute `timeout` killed the process before Playwright printed
+its error block, so treat that F3 line as unfinished, not as a confirmed failure.
+
+**Remaining for Nepali TC-014–022:** 17 blocking keys (`learningJourney`, `languageSkills`,
+`letterLauncher`, `memoryChallenge`, `correct`/`great`/`wellDone`, `timeUp`, `checkSequence`,
+`fuelLabel`, `progressLabel`, `lettersOfCount`, `wordsLearnt`, `readyForChallenge`,
+`letterRecognition`, `nextLevel`, `startLevel`) plus driving F1→F3. TC-014's last run took 36 min
+with the machine idle — matching EL-27's throttling signature — so the train fix is proven only as
+far as "the counter is now visible", not as a completed L1.
+
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
 **Status: ✅ COMPLETE & VERIFIED (2026-08-19)**
