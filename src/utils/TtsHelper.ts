@@ -13,6 +13,14 @@ import { AppLanguage } from './languages';
  */
 const VOICE_CULTURE: Partial<Record<string, string>> = {
     hindi: 'hi-IN',
+    // Nepali deliberately borrows the hi-IN voice: no ne-NP SAPI5 voice exists on this runner
+    // (installed: David/Zira en-US, Kalpana/Hemant hi-IN), and Nepali is written in the SAME
+    // Devanagari script as Hindi, so a hi-IN voice produces real audio for it where an en-US
+    // voice produces the 46-byte silence this file rejects. Pronunciation is Hindi-accented and
+    // Nepali-specific words will be mispronounced -- acceptable because the app scores that the
+    // prompt was SPOKEN, and the alternative is a hard stop. Replace with 'ne-NP' if a real
+    // Nepali voice is ever installed. UNVERIFIED against a passing F1 run -- see EL-27.
+    nepali: 'hi-IN',
 };
 
 /**
