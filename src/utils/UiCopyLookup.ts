@@ -35,6 +35,15 @@ const PLACEHOLDER_RE = /^UNOBS\b|^__(TODO|PLACEHOLDER|UNOBSERVED)/i;
 
 function assertNotPlaceholder(key: CopyKey, lang: AppLanguage, value: string): void {
     if (!PLACEHOLDER_RE.test(value)) return;
+    // ESCAPE HATCH for the harvest itself. Filling unobserved keys with non-matching placeholders
+    // is how a run is walked deep enough to SEE the real strings, so the check that stops them
+    // shipping would otherwise also stop them working. Same shape as ALLOW_STALE_F3 in
+    // foundation-f3.spec.ts: opt-in, per-run, and stated rather than silent. A normal run -- and
+    // therefore CI -- still refuses, which is the case that matters.
+    if (process.env.ALLOW_COPY_PLACEHOLDERS === '1') {
+        console.log(`[uiCopy] PLACEHOLDER in use: '${key}'/'${lang.code}' = "${value}" (ALLOW_COPY_PLACEHOLDERS=1) — harvest only, must not be committed`);
+        return;
+    }
     throw new Error(
         `uiCopy '${key}' for '${lang.code}' is a harvest PLACEHOLDER ("${value}"), not observed copy. ` +
         `Placeholders exist only to walk a run far enough to observe the real string; they must be ` +
