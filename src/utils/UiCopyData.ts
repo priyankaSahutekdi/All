@@ -125,7 +125,7 @@ export const UI_COPY = {
     // hindi observed live, EL-17 (2026-08-26): F3's Letter Launcher game heading read exactly
     // "अक्षर लॉन्चर ईंधन: 0 / 50" above a shown letter + ✓/✗ buttons — "अक्षर लॉन्चर" is this
     // key; "ईंधन" is `fuelLabel` below (screenshot: test-results/f3-unrecognised.png).
-    letterLauncher: { english: 'Letter Launcher', hindi: 'अक्षर लॉन्चर' },
+    letterLauncher: { english: 'Letter Launcher', hindi: 'अक्षर लॉन्चर', nepali: 'अक्षर लन्चर' },
     // hindi observed live, EL-21 (2026-08-26): F3's Memory Challenge screen heading read exactly
     // "मेमोरी चैलेंज" (screenshot captured via completeF3's own diagnostics after a full LL x8
     // solve run; see docs/HINDI_ROLLOUT_LOG.md EL-21/EL-22).
@@ -149,7 +149,7 @@ export const UI_COPY = {
     // ── Progress / scoring readouts (the numbers are parsed separately) ──────
     // hindi observed live, EL-17 (2026-08-26): F3 Letter Launcher's "ईंधन: 0 / 50" readout —
     // same screen/citation as `letterLauncher` above.
-    fuelLabel: { english: 'Fuel', hindi: 'ईंधन' },
+    fuelLabel: { english: 'Fuel', hindi: 'ईंधन', nepali: 'इन्धन' },
     // hindi observed live, EL-21 (2026-08-26): F3 Memory Challenge's "Progress: 0/5" readout
     // rendered the WORD "Progress" in literal English on the Hindi build — not a missing
     // translation guessed as English, a direct observation (same "unlocalized app-shell chrome"
@@ -187,7 +187,7 @@ export const UI_COPY = {
     // three (same idiom as `hurray` being confirmed correct on two different screens) rather
     // than left unobserved. If a live run ever shows a DIFFERENT Hindi phrase for a
     // "Great"/"Well done" moment specifically, split it out then — don't assume this is final.
-    correct: { english: 'Correct', hindi: 'सही है' },
+    correct: { english: 'Correct', hindi: 'सही है', nepali: 'सही' },
     great: { english: 'Great', hindi: 'सही है' },
     wellDone: { english: 'Well done', hindi: 'सही है' },
     awesome: { english: 'Awesome' },

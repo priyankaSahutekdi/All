@@ -61,9 +61,50 @@ function readData<T>(lang: AppLanguage, file: string): T {
     }
 }
 
+/**
+ * Parked accounts are MUTABLE SHARED STATE, so two languages must never name the same one.
+ *
+ * Foundation levels advance PERMANENTLY: driving F3 on `Testf3auto` carries that account past
+ * F3 for every language that names it, and it cannot be reused without a manual reset. This is
+ * not hypothetical — on 2026-09-01 `testdata/nepali/accounts.json` was created by copying
+ * English's, so a Nepali F3 run consumed ENGLISH's parked account (EL-29). The parallel runner
+ * drives language lanes concurrently, so the same collision can also corrupt two live runs at
+ * once, and it surfaces as unreproducible "flaky app" failures rather than as a fixture bug.
+ *
+ * Checked here rather than in a test because it must fail for ANY entry point that loads
+ * accounts, and it must fail BEFORE a run starts spending an account it does not own.
+ */
+function assertAccountsNotShared(lang: AppLanguage, mine: Accounts): void {
+    const root = __dirname;
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name === lang.code) continue;
+        const other = path.join(root, entry.name, 'accounts.json');
+        if (!fs.existsSync(other)) continue;
+        let theirs: Accounts;
+        try { theirs = JSON.parse(fs.readFileSync(other, 'utf8')) as Accounts; } catch { continue; }
+        const theirNames = new Set(Object.values(theirs).map((a) => a?.username).filter(Boolean));
+        const clashes = Object.entries(mine)
+            .filter(([, a]) => a?.username && theirNames.has(a.username))
+            .map(([slot, a]) => `${slot}="${a.username}"`);
+        if (clashes.length) {
+            throw new Error(
+                `Parked account collision: testdata/${lang.code}/accounts.json shares ` +
+                `${clashes.join(', ')} with testdata/${entry.name}/accounts.json. ` +
+                `Parked accounts advance PERMANENTLY, so a '${lang.code}' run would consume ` +
+                `'${entry.name}' accounts (and vice versa), and concurrent language lanes would ` +
+                `corrupt each other. Give '${lang.code}' its OWN provisioned accounts, or delete ` +
+                `testdata/${lang.code}/accounts.json so it uses the dynamic-user path instead ` +
+                `(which is what Hindi does).`,
+            );
+        }
+    }
+}
+
 /** Parked automation accounts for a language. */
 export function loadAccounts(lang: AppLanguage): Accounts {
-    return readData<Accounts>(lang, 'accounts.json');
+    const accounts = readData<Accounts>(lang, 'accounts.json');
+    assertAccountsNotShared(lang, accounts);
+    return accounts;
 }
 
 /** One parked account by series slot, with a clear error if that slot is not defined. */
