@@ -8,6 +8,7 @@ import { FoundationPage } from '../pages/foundation';
 import { DiscoveryHelper } from './DiscoveryHelper';
 import { ANY_LANGUAGE_LABEL_TOKEN, AppLanguage, labelRe, languageByCode } from './languages';
 import { copy, copyAlt, copyRe } from './UiCopy';
+import { TtsHelper } from './TtsHelper';
 import { DiscoveryData } from '../testdata';
 import { TestUser } from '../testdata/discovery/discovery-types';
 
@@ -116,20 +117,42 @@ export async function runDiscoveryFlow(
             return out;
         });
 
-    // Record one item: mic -> (record) -> stop -> replay. Returns the item text.
+    // Record one item: mic -> (real speech injected) -> stop -> replay. Returns the item text.
+    //
+    // Discovery used to record whatever Chromium's fake audio device produced -- a tone, not
+    // speech. The app scores what it hears, so a tone is a coin flip: most sentences advanced
+    // anyway, but some never did, leaving no Play/Retry/Next and stalling the run on that item
+    // forever. One Nepali sentence ("हामीले पाठशालामा सिकेका …") stalled in EVERY run that served
+    // it while shorter ones passed, which is why this first looked like sentence LENGTH and then
+    // like flaky infrastructure. It was neither: the audio was never the prompt.
+    //
+    // F1's word phases already solved this -- installMicInjection() + TtsHelper -- so Discovery
+    // now uses the same mechanism instead of a second, weaker approach. Falls back to the old
+    // silent-window behaviour if synthesis is unavailable for the run's language, so a language
+    // with no installed voice degrades exactly as before rather than failing outright.
     const recordCurrentItem = async (replay = true): Promise<string> => {
         const itemText = (await assess.getSentenceText().catch(() => '')) || '';
-        await assess.clickMike();                      // start recording
-        // Read-aloud window SCALED TO THE SENTENCE, not a flat 2500ms. A fixed window is an
-        // English-shaped assumption: it is ample for "The cat is sleeping" but far too short for
-        // a 60-character Nepali sentence, and the app rejects a recording that does not roughly
-        // cover the prompt -- it then renders no Play/Retry/Next, so the item never advances and
-        // the run stalls on that sentence. Observed 2026-09-01: Nepali Assessment 1 stalled
-        // reproducibly on its two LONGEST sentences and passed the short ones, which is what
-        // made it look intermittent. Clamped so short items are not slowed down and a runaway
-        // string cannot hang the run.
+        let b64 = '';
+        if (itemText.trim()) {
+            try {
+                b64 = TtsHelper.generateWavBase64(itemText, lang);
+            } catch (e) {
+                // Not fatal here: a language with no voice still gets the previous behaviour.
+                // Logged once per item rather than swallowed, because silent degradation is how
+                // this class of problem stayed hidden in the first place.
+                console.log(`[record] no TTS for '${lang.code}' (${(e as Error).message.split('\n')[0]}) — recording without injected speech`);
+            }
+        }
+        // Window still scales with the prompt so the injected audio has room to play out.
         const readMs = Math.min(12000, Math.max(2500, itemText.length * 120));
-        await page.waitForTimeout(readMs);             // read aloud window
+        await assess.clickMike();                      // start recording
+        await page.waitForTimeout(300);                // let the recorder open the stream
+        if (b64) {
+            await page.evaluate(async ({ b, ms }) => {
+                await (window as unknown as { __playInjected?: (x: string, n: number) => Promise<void> }).__playInjected?.(b, ms);
+            }, { b: b64, ms: readMs }).catch(() => {});
+        }
+        await page.waitForTimeout(readMs);             // read-aloud window
         await assess.clickStop();                      // stop recording
         await page.waitForTimeout(1500);
         if (replay && await assess.playButton().isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -263,6 +286,11 @@ export async function runDiscoveryFlow(
     });
 
     await test.step('TC-004: Start assessment & leave demo (sentence shown)', async () => {
+        // Give the recorder ONE persistent stream we control, so recordCurrentItem can play the
+        // prompt's real TTS audio into it. Installed here -- before the first assessment -- and
+        // idempotent, so the later assessments reuse it. See recordCurrentItem for why a fake
+        // tone was not good enough.
+        await foundation.installMicInjection().catch(() => {});
         await assess.clickStartAssessment();
         await page.waitForTimeout(3000);
         await leaveDemoIfPresent();

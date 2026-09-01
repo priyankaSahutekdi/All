@@ -78,7 +78,7 @@ export const UI_COPY = {
     // hindi observed live, H12 (2026-08-20): the post-A1-Apply celebration screen ("अरे वाह!
     // आपने सब सही किया! अगला स्तर 🦉 मुझे आप पर बहुत गर्व है! ऐसे ही जारी रखो!") — "अगला स्तर"
     // is the "Next Level" advance control embedded in that congratulatory text.
-    nextLevel: { english: 'Next Level', hindi: 'अगला स्तर' },
+    nextLevel: { english: 'Next Level', hindi: 'अगला स्तर', nepali: 'UNOBS' },
     letsGo: { english: "Let's Go" },
     // hindi observed live, H12 (2026-08-20): the app renders TWO distinct wordings for this
     // one concept depending on screen — 'खेल शुरू करें' (practice-demo entry, confirmed H11/H5)
@@ -100,8 +100,8 @@ export const UI_COPY = {
      * शुरू कर सकते हैं। सीखने की यात्रा शुरू हो!" — literal substrings, with the placement
      * level ("B") deliberately excluded, same reason the English values exclude any level.
      */
-    learningJourney: { english: 'learning journey', hindi: 'सीखने की यात्रा' },
-    languageSkills: { english: 'language skills', hindi: 'भाषा कौशल' },
+    learningJourney: { english: 'learning journey', hindi: 'सीखने की यात्रा', nepali: 'सिकाइ यात्रा' },
+    languageSkills: { english: 'language skills', hindi: 'भाषा कौशल', nepali: 'भाषा सीप' },
     /**
      * The journey-map entry into a Foundation level; `{level}` is the F# code. Hindi observed
      * live 2026-08-19 (H11) via the F1 landing screen's accessibility snapshot: "F1 शुरू करें" —
@@ -116,7 +116,7 @@ export const UI_COPY = {
     // full numbered phrase, since this key (unlike `startFoundationLevel`) has no `{level}`
     // template to hold the number, and this is only ever used as one of several OR'd "have we
     // left F3" signals (see `pastF3` below) — a broader single-word match is fine there.
-    startLevel: { english: 'Start Level', hindi: 'स्तर' },
+    startLevel: { english: 'Start Level', hindi: 'स्तर', nepali: 'UNOBS' },
     levelWord: { english: 'Level' },
     foundationWord: { english: 'Foundation' },
 
@@ -129,21 +129,21 @@ export const UI_COPY = {
     // hindi observed live, EL-21 (2026-08-26): F3's Memory Challenge screen heading read exactly
     // "मेमोरी चैलेंज" (screenshot captured via completeF3's own diagnostics after a full LL x8
     // solve run; see docs/HINDI_ROLLOUT_LOG.md EL-21/EL-22).
-    memoryChallenge: { english: 'Memory Challenge', hindi: 'मेमोरी चैलेंज' },
+    memoryChallenge: { english: 'Memory Challenge', hindi: 'मेमोरी चैलेंज', nepali: 'UNOBS' },
     // hindi observed live, EL-12 (2026-08-19): F1's post-Letter-Train practice-demo screen
     // read "अक्षर पहचान पातळी 1 • basic • 5-8 min कैसे खेलें …" — "अक्षर पहचान" ("Letter
     // Recognition") and "कैसे खेलें" (howToPlay) were confirmed correct Hindi at the time (the
     // rest of that same screen was Marathi, tracked separately as D-13/H12 — not this key).
     // Reused here since `isOnWordRecognition()` matches this exact generic activity-type
     // heading via a whole-page text scan, not a level-specific locator.
-    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान' },
+    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान', nepali: 'UNOBS' },
     didYouSee: { english: 'Did you see' },
     speakCorrectAnswer: { english: 'speak the correct answer' },
     // hindi observed live, H12 (2026-08-20): A1 Apply entry screen — full text "शाबाश!!!
     // चैलेंज के लिए तैयार हैं? गेम शुरू करें ➜". "शाबाश!!!" is the already-registered `hurray`;
     // this key is just the "Ready for Challenge?" heading fragment (question mark excluded,
     // same reasoning as other counted/punctuated fragments in this file).
-    readyForChallenge: { english: 'Ready for Challenge', hindi: 'चैलेंज के लिए तैयार हैं' },
+    readyForChallenge: { english: 'Ready for Challenge', hindi: 'चैलेंज के लिए तैयार हैं', nepali: 'UNOBS' },
     loading: { english: 'Loading' },
 
     // ── Progress / scoring readouts (the numbers are parsed separately) ──────
@@ -156,27 +156,27 @@ export const UI_COPY = {
     // pattern already confirmed for the mic-skip button, the help-language modal, and this
     // screen's own "Continue"-equivalent elsewhere — see D-10/EL-21). If a future build
     // localizes this, re-observe and correct; do not assume it stays English forever.
-    progressLabel: { english: 'Progress', hindi: 'Progress' },
+    progressLabel: { english: 'Progress', hindi: 'Progress', nepali: 'UNOBS' },
     wordsPerMinute: { english: 'Words per minute' },
     // hindi observed live, EL-24 (2026-08-26): F3's post-completion "next phase" journey map
     // (Mastery landing) header read "- सीखे गए शब्द" next to a book icon and a count — "सीखे गए
     // शब्द" ("words learnt").
-    wordsLearnt: { english: 'Words Learnt', hindi: 'सीखे गए शब्द' },
+    wordsLearnt: { english: 'Words Learnt', hindi: 'सीखे गए शब्द', nepali: 'UNOBS' },
     livesLabel: { english: 'You have' },
     /** Memory Challenge's answer-grid prompt; `{n}` is the sequence length. */
     // hindi observed live, EL-21 (2026-08-26): the SAME Memory Challenge screen showed
     // "0 of 3 letters" — again literal English, not translated. Same caveat as `progressLabel`.
-    lettersOfCount: { english: 'of {n} letters', hindi: 'of {n} letters' },
+    lettersOfCount: { english: 'of {n} letters', hindi: 'of {n} letters', nepali: 'UNOBS{n}' },
 
     // ── Transient activity states ───────────────────────────────────────────
     // hindi observed live, EL-21 (2026-08-26): Memory Challenge's countdown-expired badge read
     // "⏰ समय समाप्त!" — "समय समाप्त" ("time is over/up"), punctuation excluded per this file's
     // convention for counted/punctuated fragments (see `readyForChallenge` above).
-    timeUp: { english: 'Time Up', hindi: 'समय समाप्त' },
+    timeUp: { english: 'Time Up', hindi: 'समय समाप्त', nepali: 'UNOBS' },
     // hindi observed live, EL-23 (2026-08-26): Memory Challenge's submit button, read verbatim
     // off the accessibility tree (not a screenshot read) as `button "क्रम जाँचें"` once all 3
     // letters were selected — "क्रम" (sequence/order) + "जाँचें" (check).
-    checkSequence: { english: 'Check Sequence', hindi: 'क्रम जाँचें' },
+    checkSequence: { english: 'Check Sequence', hindi: 'क्रम जाँचें', nepali: 'UNOBS' },
 
     // ── Feedback (atomic — call sites pick the subset they mean) ─────────────
     // hindi observed live, H12 (2026-08-20): F1 Letter Hunt practice (P1) correct-answer
@@ -188,8 +188,8 @@ export const UI_COPY = {
     // than left unobserved. If a live run ever shows a DIFFERENT Hindi phrase for a
     // "Great"/"Well done" moment specifically, split it out then — don't assume this is final.
     correct: { english: 'Correct', hindi: 'सही है', nepali: 'सही' },
-    great: { english: 'Great', hindi: 'सही है' },
-    wellDone: { english: 'Well done', hindi: 'सही है' },
+    great: { english: 'Great', hindi: 'सही है', nepali: 'UNOBS' },
+    wellDone: { english: 'Well done', hindi: 'सही है', nepali: 'UNOBS' },
     awesome: { english: 'Awesome' },
     greatJob: { english: 'Great job' },
     /** The games' own wrong-answer shout, distinct from the connectivity page's `tryAgain`. */
