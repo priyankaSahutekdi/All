@@ -29,10 +29,10 @@ test.describe('@Throwaway Nepali F3 screen observation probe', () => {
         const seen = new Map<string, string>();   // normalised → first raw text seen
 
         // Read the page the same way the production locators do (FoundationPage.trainProgress /
-        // pageTextHead both use document.body.innerText), so whatever this captures is exactly
+        // pageTextHead both read document.body.innerText), so whatever this captures is exactly
         // what the real matchers would have been matching against.
         const capture = async (): Promise<void> => {
-            const raw = await page.evaluate(() => document.body.innerText).catch(() => '');
+            const raw = await page.evaluate(() => (document.body?.innerText ?? '')).catch(() => '');
             if (!raw || !raw.trim()) return;
             // Collapse whitespace and strip the digits that change every frame (counters,
             // fuel, timers) so one screen is not recorded dozens of times as it ticks.

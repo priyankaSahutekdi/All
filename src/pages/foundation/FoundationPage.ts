@@ -331,7 +331,7 @@ export class FoundationPage {
     private async pageTextMatchesAll(...patterns: RegExp[]): Promise<boolean> {
         const specs = patterns.map((p) => ({ s: p.source, f: p.flags }));
         return await this.page.evaluate((list) => {
-            const text = document.body.innerText;
+            const text = (document.body?.innerText ?? '');
             return list.every((o) => new RegExp(o.s, o.f).test(text));
         }, specs);
     }
@@ -538,9 +538,20 @@ export class FoundationPage {
      * (flicker-proof) accepting only a train-length denominator (>= 11), which excludes
      * the Letter Hunt practice / Apply "/10" and any small level counter (e.g. "1/3").
      */
-    async trainProgress(): Promise<string> {
-        return await this.page.evaluate((digitClass) => {
-            const text = document.body.innerText;
+    /**
+     * The Letter Train counter ("7/16", "3/10"), or '' when no train is showing.
+     *
+     * `acceptDenominator` is this lesson's already-observed train length. Pass it once the train
+     * has been seen: the screen LAYOUT changes between the arrow phase and the word phase (the
+     * "वर्ण" heading and the train graphic disappear), so a check that re-derives "is this a
+     * train?" from the current screen goes blind mid-lesson. Nepali's 10-item train made that
+     * visible — the counter was read as 1/10..5/10, vanished at 6/10 when the word phase
+     * rendered, and completeLetterTrain reported a FALSE "train finished after 5 items".
+     * Remembering the denominator is stable across both phases; inferring it is not.
+     */
+    async trainProgress(acceptDenominator?: number): Promise<string> {
+        return await this.page.evaluate(({ digitClass, accept }) => {
+            const text = (document.body?.innerText ?? '');
             // Fast path: the classic 16-item counter (L1–L5). Text-only → flicker-proof,
             // and never matches the Letter Hunt practice / Apply, so their detection is
             // unchanged. The numerator uses DIGIT_CLASS (script-agnostic); the "16" stays an
@@ -548,29 +559,30 @@ export class FoundationPage {
             // denominators natively too, in which case this fast path would simply miss (falling
             // through to the general match below, which still requires ASCII `parseInt` on the
             // denominator — see DIGIT_CLASS's own note in text.ts on the numeric-parsing gap).
-            const m16 = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*16`, 'u'));
+            const m16 = text.match(new RegExp(`([${digitClass}]+)\s*\/\s*16`, 'u'));
             if (m16) return m16[0];
             // Other lesson lengths (e.g. L6 = /14). Match a counter whose denominator is
             // a train length (>= 11) — TEXT-only so it stays flicker-proof through item
             // transitions, and it excludes the practice/Apply "/10" and any small level
             // counter (e.g. "1/3"), so those are never mistaken for a Letter Train.
-            const all = text.match(new RegExp(`([${digitClass}]+)\\s*\\/\\s*([${digitClass}]+)`, 'gu')) || [];
+            const all = text.match(new RegExp(`([${digitClass}]+)\s*\/\s*([${digitClass}]+)`, 'gu')) || [];
             for (const s of all) {
                 if (parseInt(s.split('/')[1], 10) >= 11) return s.trim();
             }
-            // The >= 11 rule above discriminates a Letter Train from the practice/Apply "/10"
-            // by LENGTH, which silently assumes no train is ever <= 10 items. Nepali breaks that
-            // assumption: its L1 train is 10 items ("1/10"), colliding exactly with the value the
-            // rule exists to exclude. The counter was therefore invisible and completeLetterTrain
-            // returned a FALSE "train finished after 0 items" for a train that had not started.
-            // Fall back to a STRUCTURAL signal rather than a numeric guess: the train graphic,
-            // already trusted for exactly this purpose by dismissCoachmarks below. Practice and
-            // Apply screens render letter options, not the train, so this cannot re-admit the
-            // "/10" the rule above guards against.
+            // A train THIS lesson already proved is a train, whatever its length. Only the
+            // denominator we have actually seen is accepted, so a "/10" is admitted for a
+            // 10-item train and still ignored on a practice/Apply screen during any other lesson.
+            if (accept) {
+                const match = all.find((s) => parseInt(s.split('/')[1], 10) === accept);
+                if (match) return match.trim();
+            }
+            // First sighting of a short train, before any denominator is known: fall back to a
+            // STRUCTURAL signal rather than a numeric guess — the train graphic itself, already
+            // trusted for this purpose by dismissCoachmarks below.
             const firstCounter = all[0];
             if (firstCounter && document.querySelector('img[alt="train"]')) return firstCounter.trim();
             return '';
-        }, DIGIT_CLASS);
+        }, { digitClass: DIGIT_CLASS, accept: acceptDenominator });
     }
 
     /** True when a Letter Hunt "How to Play" practice/demo screen is showing. */
@@ -586,7 +598,7 @@ export class FoundationPage {
         const howToPlay = this.copy.howToPlay;
         for (let i = 0; i < maxTries; i++) {
             const ready = await this.page.evaluate(({ s, f }) =>
-                !!document.querySelector('img[alt="train"]') || new RegExp(s, f).test(document.body.innerText),
+                !!document.querySelector('img[alt="train"]') || new RegExp(s, f).test((document.body?.innerText ?? '')),
             { s: howToPlay.source, f: howToPlay.flags });
             if (ready) return;
             await this.page.keyboard.press('Escape').catch(() => {});
@@ -706,16 +718,24 @@ export class FoundationPage {
         await this.dismissCoachmarks();
         await this.installMicInjection();
         let stuck = 0;
+        // This lesson's train length, learned from the first counter we see. The screen LAYOUT
+        // differs between the arrow phase and the word phase, so "is a train showing?" cannot be
+        // re-derived reliably on each iteration — see trainProgress.
+        let denom: number | undefined;
         for (let i = 0; i < 45; i++) {
-            let p = await this.trainProgress();
+            let p = await this.trainProgress(denom);
             if (!p) {
                 // Confirm the train is really gone (the counter/graphic can blink out for
                 // a beat during an item transition) before treating the lesson as done.
                 await this.page.waitForTimeout(700);
-                p = await this.trainProgress();
+                p = await this.trainProgress(denom);
                 if (!p) {
                     return completed(`train finished after ${i} items`);
                 }
+            }
+            if (denom === undefined) {
+                const parsed = parseInt(p.split('/')[1] ?? '', 10);
+                if (Number.isFinite(parsed)) denom = parsed;
             }
             console.log(`[Letter Train] ${p}`);
             const arrow = await this.rightmostArrow();
@@ -739,7 +759,7 @@ export class FoundationPage {
                 await this.assess.clickRecordToggle();   // stop → advances
                 await this.page.waitForTimeout(1500);
             }
-            const np = await this.trainProgress();
+            const np = await this.trainProgress(denom);
             stuck = np === p ? stuck + 1 : 0;
             // Not advancing can mean the app dropped its connection (redeploy) rather than
             // "lesson finished" — recover and keep driving instead of silently giving up.
@@ -942,7 +962,7 @@ export class FoundationPage {
     private async hasWordQuestion(): Promise<boolean> {
         const notOption = this.copy.notAnAnswerOption;
         return await this.page.evaluate(({ s, f, bs, bf }) => {
-            if (!/🔊/.test(document.body.innerText)) return false;
+            if (!/🔊/.test((document.body?.innerText ?? ''))) return false;
             const oneWord = new RegExp(s, f);
             const bad = new RegExp(bs, bf);
             let n = 0;
@@ -1116,7 +1136,7 @@ export class FoundationPage {
         const { launcherChrome, fuelCounter, letterLauncher } = this.copy;
         return await this.page.evaluate(({ s, f, chromeSrc, chromeFlags, fuelSrc, onSrc }) => {
             const w = window as unknown as { __spokenLetter: string | null };
-            const body = document.body.innerText;
+            const body = (document.body?.innerText ?? '');
             // The prompt is a heading holding a pure-letter token — a single letter (letter
             // rounds) or a word (word rounds). Exclude the UI headings; the language name is
             // one of them, and both it and the game-title words come from registries, so they
@@ -1223,7 +1243,7 @@ export class FoundationPage {
      *  whatever is separated by dashes. */
     private async displayedSequence(): Promise<string[]> {
         return await this.page.evaluate((cls) => {
-            const m = document.body.innerText.match(new RegExp(`[${cls}]+(?:\\s*-\\s*[${cls}]+)+`, 'u'));
+            const m = (document.body?.innerText ?? '').match(new RegExp(`[${cls}]+(?:\\s*-\\s*[${cls}]+)+`, 'u'));
             return m ? m[0].split(/\s*-\s*/).map((s) => s.trim()).filter(Boolean) : [];
         }, LETTER_CLASS);
     }
@@ -1253,7 +1273,7 @@ export class FoundationPage {
                     return completed(`advanced past the Memory Challenge after ${round} rounds`);
                 }
                 const progress = this.copy.progressCounter.source;
-                const full = await this.page.evaluate((src) => { const m = document.body.innerText.match(new RegExp(src, 'i')); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; }, progress);
+                const full = await this.page.evaluate((src) => { const m = (document.body?.innerText ?? '').match(new RegExp(src, 'i')); return m ? (+m[1] >= +m[2] && +m[2] > 0) : false; }, progress);
                 if (full) {
                     return completed(`all rounds done (progress counter full) after ${round} rounds`);
                 }
@@ -1591,7 +1611,7 @@ export class FoundationPage {
     /** First ~200 chars of visible page text (single-line) — for diagnostics. */
     private async pageTextHead(): Promise<string> {
         return await this.page.evaluate(() =>
-            document.body.innerText.replace(/\s+/g, ' ').trim().slice(0, 200));
+            (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim().slice(0, 200));
     }
 
     /**

@@ -159,7 +159,7 @@ test.describe('@P0 @Foundation F1 series (single session, single login)', () => 
                 // Capture the Mastery landing — definitive evidence of which level the single
                 // (linear) user lands on, and whether Level 4 is reachable or gated.
                 const mapState = await page.evaluate(() => {
-                    const t = document.body.innerText.replace(/\s+/g, ' ');
+                    const t = (document.body?.innerText ?? '').replace(/\s+/g, ' ');
                     const starts = Array.from(t.matchAll(/Start Level \d+/gi)).map((m) => m[0]);
                     return { starts: Array.from(new Set(starts)), head: t.slice(0, 220) };
                 });

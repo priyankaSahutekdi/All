@@ -29,10 +29,10 @@ test.describe('@Throwaway Nepali flow observation probe', () => {
         const seen = new Map<string, string>();
 
         // Read the page exactly as the production locators do (FoundationPage.trainProgress and
-        // pageTextHead both use document.body.innerText), so what this captures is what the real
+        // pageTextHead both read document.body.innerText), so what this captures is what the real
         // matchers would have been matching against.
         const capture = async (): Promise<void> => {
-            const raw = await page.evaluate(() => document.body.innerText).catch(() => '');
+            const raw = await page.evaluate(() => (document.body?.innerText ?? '')).catch(() => '');
             if (!raw || !raw.trim()) return;
             // Collapse whitespace and mask digits so one screen is not recorded dozens of times
             // as its counters/timers tick.
