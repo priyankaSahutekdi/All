@@ -100,8 +100,38 @@ function assertAccountsNotShared(lang: AppLanguage, mine: Accounts): void {
     }
 }
 
-/** Parked automation accounts for a language. */
+/**
+ * Parked automation accounts for a language, or a clear explanation of why there are none.
+ *
+ * NOT every language has these, and that is a legitimate state rather than a gap to fill.
+ * There are two ways a language gets F2/F3 coverage:
+ *
+ *   - PARKED ACCOUNT (english): `foundation-f2.spec.ts` / `foundation-f3.spec.ts` log in as an
+ *     account already sitting at that level and drive it directly. Fast, but the account advances
+ *     PERMANENTLY, so it is single-use until reset.
+ *   - DYNAMIC USER (hindi, nepali): the `FULL_E2E` run plays one fresh guest through
+ *     Discovery → F1 → F2 → F3 in a single session. Slower, but consumes no shared fixture.
+ *     Confirmed viable 2026-09-01: Hindi passed TC-001–TC-023 this way in 54m32s.
+ *
+ * The generic `readData` message is actively misleading here — it tells the reader the file
+ * "must be observed on a real build, not translated", which is true of screen copy and of
+ * discovery-data.json but nonsense for an account: accounts are PROVISIONED in the app, not read
+ * off a screen. Someone hitting that message would go looking for something unobservable.
+ */
 export function loadAccounts(lang: AppLanguage): Accounts {
+    const full = path.join(dataDir(lang), 'accounts.json');
+    if (!fs.existsSync(full)) {
+        throw new Error(
+            `No parked accounts for language '${lang.code}' (expected ${full}).\n` +
+            `This is not a missing translation — parked accounts are PROVISIONED in the app, not ` +
+            `observed on a build. Either:\n` +
+            `  • run this language through the dynamic-user path instead (FULL_E2E: ` +
+            `npm run e2e:full:${lang.code}), which is how hindi and nepali are covered; or\n` +
+            `  • provision accounts FOR '${lang.code}' and add them here. Do NOT copy another ` +
+            `language's file: parked accounts advance permanently, so sharing one makes each ` +
+            `language consume the other's progress (see assertAccountsNotShared).`,
+        );
+    }
     const accounts = readData<Accounts>(lang, 'accounts.json');
     assertAccountsNotShared(lang, accounts);
     return accounts;
