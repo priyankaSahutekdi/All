@@ -28,19 +28,32 @@ export interface AppLanguage {
 }
 
 /**
- * Taken from the app's own header language switcher. Only `english` is exercised by the
- * current suite; the rest are listed because the switcher offers them and because matching
- * the *current* label is how the driver decides whether it needs to switch at all.
+ * The languages this build of the app actually offers, in the order its own picker lists them.
+ *
+ * OBSERVED, not assumed (2026-09-01, Build #23, EL-29): the learning-language picker was
+ * captured verbatim on a live run in two different UI languages and both list exactly five —
+ *   "भाषा चुनें        A English  क हिंदी  ಕ ಕನ್ನಡ  ఈ తెలుగు  न नेपाली"
+ *   "भाषा छान्नुहोस्   A English  क हिंदी  ಕ ಕನ್ನಡ  ఈ తెలుగు  न नेपाली"
+ * The app titles itself "Welcome to AXL - Sikkim", and Nepali is an official language of
+ * Sikkim, which is consistent with this being a Sikkim deployment.
+ *
+ * `tamil`, `gujarati` and `odia` were listed here until that capture and are NOT in this build.
+ * They are removed rather than left as harmless spares: this list feeds ANY_LANGUAGE_LABEL /
+ * ANY_LANGUAGE_LABEL_TOKEN, which strip language names out of scraped screen text, so a phantom
+ * label is a live matcher looking for something that can never appear — and leaving them here
+ * invites someone to run `--lang=tamil` against a build that has no Tamil and read the timeout
+ * as a code defect. Re-add only from a fresh capture of the picker.
+ *
+ * Exercised by the suite today: english, hindi, nepali. kannada and telugu are offered by the
+ * app but have no observed UI copy yet (see missingCopyKeys), so they are listed — matching the
+ * CURRENT label is how the driver decides whether it needs to switch at all — but not runnable.
  */
 export const LANGUAGES: AppLanguage[] = [
     { code: 'english', label: 'English' },
     { code: 'hindi', label: 'हिंदी', aliases: ['Hindi'] },
     { code: 'nepali', label: 'नेपाली', aliases: ['Nepali'] },
-    { code: 'tamil', label: 'தமிழ்', aliases: ['Tamil'] },
-    { code: 'telugu', label: 'తెలుగు', aliases: ['Telugu'] },
     { code: 'kannada', label: 'ಕನ್ನಡ', aliases: ['Kannada'] },
-    { code: 'gujarati', label: 'ગુજરાતી', aliases: ['Gujarati'] },
-    { code: 'odia', label: 'ଓଡିଆ', aliases: ['Odia'] },
+    { code: 'telugu', label: 'తెలుగు', aliases: ['Telugu'] },
 ];
 
 /** Look up a language by code (case-insensitive). Throws on an unknown code. */
