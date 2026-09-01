@@ -61,6 +61,11 @@ test.describe('@Throwaway Nepali flow observation probe', () => {
             await foundation.expectF1Landing();
             stages.push('F1 landing: OK');
             await foundation.clickStartF1();
+            // completeFoundationThroughApply assumes the intro coach-marks are already gone --
+            // true in the real spec only because completeLetterTrain dismisses them first. Called
+            // directly it lands on the "वर्णमाला चार्ट" tooltip and reports "screen not
+            // recognised after 0 nodes", which reads as a driver bug rather than an ordering one.
+            await foundation.dismissCoachmarks();
             // Drive the whole L/P/A chain, not just L1: readyForChallenge lives on the A1 entry
             // screen and great/wellDone/nextLevel only appear during and after Apply, so a probe
             // that stops at the first Letter Train can never see them.

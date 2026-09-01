@@ -225,8 +225,13 @@ export async function runDiscoveryFlow(
                     throw new Error(
                         `[${label}] stalled on item ${i + 1}: the sentence has not changed for ` +
                         `${STALL_REPEATS + 1} consecutive recordings ("${txt}"). Next is not advancing -- ` +
-                        `typically the recording was never accepted, so no Play/Retry/Next control ` +
-                        `rendered. This is NOT a missing completion-popup translation.`,
+                        `the recording was never accepted, so no Play/Retry/Next control rendered. ` +
+                        `This is NOT a missing completion-popup translation, and NOT a recording-window ` +
+                        `problem -- both were tried and neither helps. Some assessment items appear to be ` +
+                        `UNPASSABLE app-side: the Nepali sentence starting "हामीले पाठशालामा सिकेका" ` +
+                        `stalled in 100% of runs that served it (n=4) and passed in 100% that did not ` +
+                        `(n=3), with real TTS audio injected either way. If this names a specific ` +
+                        `sentence repeatedly, raise it as app content rather than debugging the driver.`,
                     );
                 }
             } else {
