@@ -108,7 +108,7 @@ export const UI_COPY = {
      * note the REVERSED word order vs English (level first, then the "start" verb), which is why
      * this is a template rather than a fixed prefix/suffix string.
      */
-    startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें' },
+    startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें', nepali: '{level} सुरु गर्नुहोस्' },
     // hindi observed live, EL-24 (2026-08-26): the Mastery landing screen (shown after F3
     // genuinely completes) has a "स्तर 1 शुरू करें" ("Start Level 1") button — same reversed
     // word order as `startFoundationLevel`. Recorded as the distinguishing word "स्तर" ("Level"/
@@ -212,8 +212,8 @@ export const UI_COPY = {
     // "हुर्रे!!!" / "तपाईंले सफलतापूर्वक मूल्याङ्कन पूरा गर्नुभयो" / "जारी राख्नुहोस्" (the last is
     // `continueLabel`, confirmed correct by TC-009/TC-010 clicking it successfully).
     hurray: { english: 'Hurray', hindi: 'शाबाश!!!', nepali: 'हुर्रे!!!' },
-    successfully: { english: 'successfully', nepali: 'सफलतापूर्वक' },
-    complete: { english: 'complete', nepali: 'पूरा' },
+    successfully: { english: 'successfully' },
+    complete: { english: 'complete' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
     congratulations: { english: 'congrat' },
     /**

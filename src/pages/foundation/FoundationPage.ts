@@ -558,6 +558,17 @@ export class FoundationPage {
             for (const s of all) {
                 if (parseInt(s.split('/')[1], 10) >= 11) return s.trim();
             }
+            // The >= 11 rule above discriminates a Letter Train from the practice/Apply "/10"
+            // by LENGTH, which silently assumes no train is ever <= 10 items. Nepali breaks that
+            // assumption: its L1 train is 10 items ("1/10"), colliding exactly with the value the
+            // rule exists to exclude. The counter was therefore invisible and completeLetterTrain
+            // returned a FALSE "train finished after 0 items" for a train that had not started.
+            // Fall back to a STRUCTURAL signal rather than a numeric guess: the train graphic,
+            // already trusted for exactly this purpose by dismissCoachmarks below. Practice and
+            // Apply screens render letter options, not the train, so this cannot re-admit the
+            // "/10" the rule above guards against.
+            const firstCounter = all[0];
+            if (firstCounter && document.querySelector('img[alt="train"]')) return firstCounter.trim();
             return '';
         }, DIGIT_CLASS);
     }

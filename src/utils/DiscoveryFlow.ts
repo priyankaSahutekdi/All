@@ -120,7 +120,16 @@ export async function runDiscoveryFlow(
     const recordCurrentItem = async (replay = true): Promise<string> => {
         const itemText = (await assess.getSentenceText().catch(() => '')) || '';
         await assess.clickMike();                      // start recording
-        await page.waitForTimeout(2500);               // read aloud window
+        // Read-aloud window SCALED TO THE SENTENCE, not a flat 2500ms. A fixed window is an
+        // English-shaped assumption: it is ample for "The cat is sleeping" but far too short for
+        // a 60-character Nepali sentence, and the app rejects a recording that does not roughly
+        // cover the prompt -- it then renders no Play/Retry/Next, so the item never advances and
+        // the run stalls on that sentence. Observed 2026-09-01: Nepali Assessment 1 stalled
+        // reproducibly on its two LONGEST sentences and passed the short ones, which is what
+        // made it look intermittent. Clamped so short items are not slowed down and a runaway
+        // string cannot hang the run.
+        const readMs = Math.min(12000, Math.max(2500, itemText.length * 120));
+        await page.waitForTimeout(readMs);             // read aloud window
         await assess.clickStop();                      // stop recording
         await page.waitForTimeout(1500);
         if (replay && await assess.playButton().isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -169,7 +178,10 @@ export async function runDiscoveryFlow(
     };
 
     // Dynamic loop: record/replay/next until a completion popup appears.
+    const STALL_REPEATS = 2;
     const completeUntilPopup = async (label: string, maxItems = 20): Promise<void> => {
+        let lastText = '';
+        let repeats = 0;
         for (let i = 0; i < maxItems; i++) {
             if (await completionVisible()) {
                 console.log(`[${label}] completion popup after ${i} items`);
@@ -179,6 +191,25 @@ export async function runDiscoveryFlow(
             const txt = await recordCurrentItem(true);
             console.log(`[${label}] item ${i + 1}: "${txt}"`);
             if (await completionVisible()) return;
+            // FAIL FAST ON A STALL. clickNext() below swallows its error, so a Next that never
+            // lands (or a recording the app never accepts, leaving no post-record controls to
+            // click) used to spin out the full maxItems -- 20 iterations, 12-25 min -- and then
+            // report "completion popup not reached", which names a symptom on the wrong screen
+            // and sends the next reader hunting for a missing completion string. The item text
+            // not changing is the actual signal, so say that instead, immediately.
+            if (txt && txt === lastText) {
+                if (++repeats >= STALL_REPEATS) {
+                    throw new Error(
+                        `[${label}] stalled on item ${i + 1}: the sentence has not changed for ` +
+                        `${STALL_REPEATS + 1} consecutive recordings ("${txt}"). Next is not advancing -- ` +
+                        `typically the recording was never accepted, so no Play/Retry/Next control ` +
+                        `rendered. This is NOT a missing completion-popup translation.`,
+                    );
+                }
+            } else {
+                repeats = 0;
+                lastText = txt;
+            }
             // advance to next item
             await assess.clickNext().catch(() => {});
             await page.waitForTimeout(2500);
