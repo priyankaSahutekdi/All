@@ -136,7 +136,7 @@ export const UI_COPY = {
     // rest of that same screen was Marathi, tracked separately as D-13/H12 — not this key).
     // Reused here since `isOnWordRecognition()` matches this exact generic activity-type
     // heading via a whole-page text scan, not a level-specific locator.
-    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान' },
+    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान', nepali: 'अक्षर चिनाइ' },
     didYouSee: { english: 'Did you see' },
     speakCorrectAnswer: { english: 'speak the correct answer' },
     // hindi observed live, H12 (2026-08-20): A1 Apply entry screen — full text "शाबाश!!!
