@@ -22,4 +22,8 @@
  */
 module.exports = {
     'src/**/*.ts': ['eslint'],
+    // Harvest placeholders must never reach a commit. They were committed three times in one
+    // session despite a runtime guard, because that guard stops them being USED, not COMMITTED.
+    // See scripts/check-no-placeholders.js for why a quiet placeholder is worse than a loud one.
+    'src/**/*.{ts,json}': ['node scripts/check-no-placeholders.js'],
 };
