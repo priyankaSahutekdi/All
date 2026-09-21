@@ -3057,6 +3057,45 @@ its error block, so treat that F3 line as unfinished, not as a confirmed failure
 with the machine idle — matching EL-27's throttling signature — so the train fix is proven only as
 far as "the counter is now visible", not as a completed L1.
 
+### EL-29 — UAT is time-gated to school hours, and a run that crosses the boundary hangs rather than fails
+
+**Date:** 2026-09-21 · **Status:** ✅ recorded (environment constraint, no code fix attempted yet)
+
+A Nepali observation run started late in the evening captured this mid-flow, in English, on an
+otherwise normal Nepali screen:
+
+> **Available during school hours** — This system is up and running when schools are operational
+> (8:00 AM – 24:00 PM IST). Please come back during school hours. **Try Again**
+
+**UAT refuses service outside 08:00–24:00 IST.** This had not been observed before and it changes
+how long runs must be scheduled:
+
+| suite | measured duration |
+|---|---|
+| English `FULL_E2E` (TC-001–023) | 65m 17s |
+| Hindi `FULL_E2E` (TC-001–023) | 54m 32s |
+
+So anything launched after roughly **22:45 IST crosses midnight and dies on the gate**. That rules
+out the obvious "kick the long suite off at the end of the day" habit, and it matters for CI
+scheduling: a nightly cron in the small hours would fail every single time, for a reason that
+looks nothing like its cause.
+
+**The failure mode is the expensive part.** The gate does not surface as "come back later" — the
+app simply stops rendering what the driver is waiting for, so the run blocks on an ordinary
+`toBeVisible` timeout. In this instance the machine then suspended with the run still hanging and
+Playwright reported a duration of **2502 minutes (1.7 days)**. Two days of wall clock bought
+nothing, and the log's proximate error (`expect(locator).toBeVisible() failed`) names neither the
+gate nor the sleep.
+
+**Worth fixing in code, not just documenting:** the banner text is a stable, language-independent
+English string, so a check for it on the stall/timeout paths could convert a 75-minute hang into a
+one-line failure that names the real cause. Not done yet — it touches shared code and would need
+the usual English/Hindi regression before it is trusted.
+
+**Also of note:** the duration figure is itself a useful signal. A step time in the thousands of
+minutes means the host slept mid-run; a step time inflated ~400× uniformly means idle throttling
+(EL-27). Neither is ever a code result, and both have cost real debugging time in this project.
+
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
 **Status: ✅ COMPLETE & VERIFIED (2026-08-19)**
