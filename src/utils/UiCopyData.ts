@@ -111,12 +111,21 @@ export const UI_COPY = {
     startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें', nepali: '{level} सुरु गर्नुहोस्' },
     // hindi observed live, EL-24 (2026-08-26): the Mastery landing screen (shown after F3
     // genuinely completes) has a "स्तर 1 शुरू करें" ("Start Level 1") button — same reversed
-    // word order as `startFoundationLevel`. Recorded as the distinguishing word "स्तर" ("Level"/
-    // "Stage", Mastery's own vocabulary, distinct from Foundation's "F#" codes) rather than the
-    // full numbered phrase, since this key (unlike `startFoundationLevel`) has no `{level}`
-    // template to hold the number, and this is only ever used as one of several OR'd "have we
-    // left F3" signals (see `pastF3` below) — a broader single-word match is fine there.
-    startLevel: { english: 'Start Level', hindi: 'स्तर' },
+    // word order as `startFoundationLevel`.
+    //
+    // HINDI IS DELIBERATELY ABSENT, and must stay absent unless it can be given a value that is
+    // not a substring of `nextLevel`. EL-24 recorded it as the bare word "स्तर" on the reasoning
+    // that "a broader single-word match is fine" for an OR'd `pastF3` signal. That reasoning was
+    // WRONG and cost real coverage (2026-09-21): `nextLevel`/hindi is "अगला स्तर", which CONTAINS
+    // "स्तर". `optFrag` joins pastF3 fragments unanchored, so the mid-F3 celebration screen's
+    // "Next Level" button matched `pastF3` and the driver concluded F3 was over after the FIRST
+    // Memory Challenge. Hindi TC-021/022 passed green on ~40% of F3 (9 of 22 nodes) for a month.
+    //
+    // English is unaffected only by luck of phrasing: "Start Level" does not occur inside
+    // "Next Level". Hindi now detects "past F3" from `wordsLearnt` alone, which the multi-signal
+    // design explicitly supports (see `pastF3`) — and if that one signal ever fails to render,
+    // F3 exhausts its iteration budget and fails LOUDLY, which is the safe direction.
+    startLevel: { english: 'Start Level' },
     levelWord: { english: 'Level' },
     foundationWord: { english: 'Foundation' },
 

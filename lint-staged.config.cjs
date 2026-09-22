@@ -26,4 +26,7 @@ module.exports = {
     // session despite a runtime guard, because that guard stops them being USED, not COMMITTED.
     // See scripts/check-no-placeholders.js for why a quiet placeholder is worse than a loud one.
     'src/**/*.{ts,json}': ['node scripts/check-no-placeholders.js'],
+    // A level-exit marker that also matches copy shown DURING the level ends the level early
+    // and still reports a PASS. That hid ~60% of Hindi F3 for a month; see the script's header.
+    'src/utils/UiCopyData.ts': ['node scripts/check-copy-collisions.js'],
 };
