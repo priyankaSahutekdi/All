@@ -28,12 +28,25 @@ The item:
 ## Evidence
 
 Assessment 1 draws its sentences from a pool, so whether a run hits this item varies. Across seven
-runs on 2026-09-01 the correlation is total:
+runs on 2026-09-01, plus one re-test on 2026-09-21, the correlation is total:
 
 | runs | outcome |
 |---|---|
-| 4 that served this sentence | **4 stalled** (100%) |
+| 5 that served this sentence | **5 stalled** (100%) |
 | 3 that did not serve it | **3 passed** (100%) |
+
+**Still present on Build #28** (2026-09-21, `all-3.0.7 · 9e52193`) — five builds after it was first
+reported on Build #23. The re-test served the item as sentence 3 of Assessment 1 and re-read it
+identically as items 4 and 5 before the stall detector gave up:
+
+```
+[Assessment 1] item 3: हामीले पाठशालामा सिकेका राम्रा कुराहरू जीवनमा अप्नाउँछौँ।
+[Assessment 1] item 4: हामीले पाठशालामा सिकेका राम्रा कुराहरू जीवनमा अप्नाउँछौँ।
+[Assessment 1] item 5: हामीले पाठशालामा सिकेका राम्रा कुराहरू जीवनमा अप्नाउँछौँ।
+```
+
+TC-001 through TC-008 passed in that same run, so the Nepali flow is sound right up to the point
+this item is served.
 
 Every stall is on this sentence specifically, and the run recovers on no subsequent attempt — the
 same sentence is re-read indefinitely because the app never offers a way forward.
