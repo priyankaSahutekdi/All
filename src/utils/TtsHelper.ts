@@ -1,53 +1,57 @@
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { AppLanguage } from './languages';
 
+type OSType = 'win32' | 'darwin' | 'linux';
+
 /**
- * Windows SAPI5 culture tag (BCP-47) for each language's TTS voice, keyed by `AppLanguage.code`.
- * English has no entry: the runner's default voice (David/Zira) already speaks it, so no
- * explicit `SelectVoice` is needed. Add an entry here only once a real SAPI5 voice for that
- * language is actually installed on the target runner(s) — see `docs/LANGUAGE_ONBOARDING.md (Appendix A)`.
+ * Language/voice mapping for each platform.
+ * Windows uses SAPI5 culture tags (BCP-47).
+ * Linux uses espeak language codes.
+ * macOS uses voice names.
  */
-const VOICE_CULTURE: Partial<Record<string, string>> = {
-    hindi: 'hi-IN',
-    // Nepali deliberately borrows the hi-IN voice: no ne-NP SAPI5 voice exists on this runner
-    // (installed: David/Zira en-US, Kalpana/Hemant hi-IN), and Nepali is written in the SAME
-    // Devanagari script as Hindi, so a hi-IN voice produces real audio for it where an en-US
-    // voice produces the 46-byte silence this file rejects. Pronunciation is Hindi-accented and
-    // Nepali-specific words will be mispronounced -- acceptable because the app scores that the
-    // prompt was SPOKEN, and the alternative is a hard stop. Replace with 'ne-NP' if a real
-    // Nepali voice is ever installed. UNVERIFIED against a passing F1 run -- see EL-27.
-    nepali: 'hi-IN',
+const VOICE_CONFIG: Partial<Record<string, Record<OSType, string>>> = {
+    hindi: {
+        win32: 'hi-IN',
+        linux: 'hi',
+        darwin: 'Samantha', // fallback; macOS voices are limited
+    },
+    nepali: {
+        win32: 'hi-IN',
+        linux: 'hi', // espeak doesn't have Nepali, use Hindi as fallback
+        darwin: 'Samantha',
+    },
 };
 
 /**
- * Text-to-speech helper for the F-series "say the word" recording assessments.
+ * Cross-platform text-to-speech helper for the F-series "say the word" recording assessments.
  *
  * The word screens display a word as TEXT with no audio prompt, and the app hosts no
  * word audio to reuse — so to feed the *correct* word into the microphone (instead of
- * Chromium's fake tone) we synthesize the word locally. On Windows we use the built-in
- * SAPI voice via PowerShell (`System.Speech.Synthesis`), which needs no network or
- * extra dependency. The resulting WAV bytes are returned base64-encoded so they can be
- * handed to the page and decoded into the injected microphone stream.
+ * Chromium's fake tone) we synthesize the word locally. The implementation automatically
+ * selects the appropriate TTS backend based on the operating system:
+ *
+ *   - Windows: Built-in SAPI5 via PowerShell (`System.Speech.Synthesis`)
+ *   - Linux: espeak/espeak-ng command-line tool
+ *   - macOS: Built-in `say` command
+ *
+ * The resulting WAV bytes are returned base64-encoded so they can be handed to the page
+ * and decoded into the injected microphone stream.
  *
  * Non-Latin text now survives the input filter, but that is only half of what a non-English
  * language needs, and the other half is an environment prerequisite rather than code:
  *
- *   SAPI synthesizes with the selected installed voice. This runner has only `Microsoft
- *   David/Zira Desktop` (en-US), and handing an en-US voice Devanagari yields a valid but
- *   EMPTY wav — a 46-byte header, i.e. silence. Verified, not assumed.
+ * For non-English languages:
+ *   - Windows: Requires appropriate SAPI5 voice installed (e.g., hi-IN for Hindi)
+ *   - Linux: Requires espeak package and appropriate language data
+ *   - macOS: Uses available system voices
  *
- * So Hindi read-aloud needs (a) a hi-IN voice installed on whatever machine runs the suite,
- * and (b) voice selection by language here. Both belong to the Hindi support work once the
- * real Hindi build has been probed — BUILD_HISTORY.md (Refactoring Plan section) tasks 13-14.
- *
- * Until then, that silence is detected and THROWN rather than returned: a 46-byte WAV is
- * still non-empty base64, so every `if (b64)` guard at the call sites passed and the app went
- * on to record silence with nothing to trace. Failing here names the cause instead. See
- * MIN_REAL_WAV_BYTES for the measured numbers behind the threshold.
+ * Silence is detected and THROWN rather than returned: a 46-byte WAV is still non-empty
+ * base64, so every `if (b64)` guard at the call sites passed and the app went on to record
+ * silence with nothing to trace. Failing here names the cause instead. See MIN_REAL_WAV_BYTES.
  */
 export class TtsHelper {
     // Cache per word so we synthesize each word only once per run.
@@ -68,95 +72,54 @@ export class TtsHelper {
     /** Hard cap on the SAPI subprocess so a hung voice cannot consume the whole test timeout. */
     private static readonly SYNTH_TIMEOUT_MS = 20000;
 
-    /**
-     * Synthesize `text` to a WAV via Windows SAPI; returns the WAV bytes as base64.
-     *
-     * `lang` selects the installed voice by culture (`VOICE_CULTURE`) when given; omitted (or a
-     * language with no culture entry, e.g. English) uses the runner's default voice unchanged —
-     * zero behavior change for every existing call site. Verified live, 2026-08-19 (H1): a hi-IN
-     * voice bridged into the classic SAPI5 hive (`LANGUAGE_ONBOARDING.md (Appendix A)`) synthesizes real Devanagari
-     * speech via this exact `execFileSync`/`-Command` mechanism (41,966 bytes for "अनार", not the
-     * 46-byte silence a mismatched-language voice produces).
-     */
     static generateWavBase64(text: string, lang?: AppLanguage): string {
-        // Keep letters (any script), digits and spaces; drop punctuation and symbols, which
-        // SAPI would either read aloud ("exclamation mark") or choke on. The previous
-        // `[^A-Za-z0-9 ]` rule deleted every Devanagari code point, so a Hindi word reduced
-        // to '' and this returned no audio at all — the app then recorded silence with no
-        // error to trace. `\p{M}` is required alongside `\p{L}`: matras are marks, so
-        // without it "किताब" would be mangled to "कतब".
         const safe = (text || '').replace(/[^\p{L}\p{M}\p{N} ]/gu, '').trim();
         if (!safe) {return '';}
-        const culture = lang ? VOICE_CULTURE[lang.code] : undefined;
-        const cacheKey = `${culture || 'default'}:${safe.toLowerCase()}`;
+
+        const voiceConfig = lang ? VOICE_CONFIG[lang.code] : undefined;
+        const osType = process.platform as OSType;
+        const voice = voiceConfig?.[osType];
+        const cacheKey = `${voice || 'default'}:${safe.toLowerCase()}`;
         const cached = TtsHelper.cache.get(cacheKey);
         if (cached) {return cached;}
 
-        // Temp filename must stay ASCII — it is interpolated into a PowerShell command line,
-        // so a non-ASCII path would add a code-page variable to an already fiddly hop. The
-        // readable slug is kept for Latin words; other scripts get a stable hash.
         const slug = safe.toLowerCase().replace(/\s+/g, '_');
         const stem = /^[a-z0-9_]+$/.test(slug) ? slug : createHash('sha1').update(slug).digest('hex').slice(0, 16);
         const outFile = path.join(os.tmpdir(), `tts_${stem}.wav`);
-        // Select the installed voice by culture when one is required. Thrown loudly if missing
-        // (not a silent fallback to the default voice), for the same reason MIN_REAL_WAV_BYTES
-        // throws below: a mismatched-language voice produces a "valid" but silent WAV, so the
-        // failure must name its cause rather than surface later as a 46-byte-file mystery.
-        const selectVoice = culture
-            ? `$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq '${culture}' } | Select-Object -First 1; `
-              + `if (-not $v) { throw 'No installed SAPI5 voice for culture ${culture} - see docs/LANGUAGE_ONBOARDING.md (Appendix A)' }; `
-              + '$s.SelectVoice($v.VoiceInfo.Name);'
-            : '';
-        // 16 kHz / 16-bit / mono PCM is widely decodable by Web Audio decodeAudioData.
-        const ps = [
-            "Add-Type -AssemblyName System.Speech;",
-            '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
-            selectVoice,
-            "$fmt = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000,[System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen,[System.Speech.AudioFormat.AudioChannel]::Mono);",
-            `$s.SetOutputToWaveFile('${outFile}', $fmt);`,
-            // Doubling `'` is how a literal quote is escaped in a PowerShell single-quoted
-            // string. Punctuation is stripped above so this cannot trigger today; it is here
-            // so widening that filter later cannot turn into command construction.
-            `$s.Speak('${safe.replace(/'/g, "''")}');`,
-            '$s.Dispose();',
-        ].filter(Boolean).join(' ');
 
-        // stderr is captured, not discarded: SAPI can fail non-terminally, exit 0 and write no
-        // file, in which case the readFileSync below throws a bare ENOENT and the actual
-        // diagnosis is whatever PowerShell printed. `stdio: 'ignore'` used to throw it away.
         try {
-            execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
-                stdio: ['ignore', 'ignore', 'pipe'],
-                timeout: TtsHelper.SYNTH_TIMEOUT_MS,
-            });
+            switch (osType) {
+                case 'win32':
+                    TtsHelper.synthesizeWindows(safe, voice, outFile);
+                    break;
+                case 'darwin':
+                    TtsHelper.synthesizeMacOS(safe, voice, outFile);
+                    break;
+                case 'linux':
+                    TtsHelper.synthesizeLinux(safe, voice, outFile);
+                    break;
+                default:
+                    throw new Error(`Unsupported platform: ${process.platform}`);
+            }
         } catch (e) {
-            const err = e as { stderr?: Buffer; signal?: string; message?: string };
-            const stderr = (err.stderr?.toString() || '').trim();
+            const err = e as { signal?: string; message?: string };
             throw new Error(
-                `TTS synthesis failed for "${safe}"` +
+                `TTS synthesis failed for "${safe}" on ${osType}` +
                 (err.signal === 'SIGTERM' ? ` (timed out after ${TtsHelper.SYNTH_TIMEOUT_MS}ms)` : '') +
-                (stderr ? `\nPowerShell stderr: ${stderr}` : `\n${err.message || ''}`),
+                `\n${err.message || ''}`,
             );
         }
 
         const buf = fs.readFileSync(outFile);
         try { fs.unlinkSync(outFile); } catch { /* ignore */ }
 
-        // A WAV that is header-only is silence, and silence is NOT a usable prompt: the app
-        // would record nothing and the assessment would fail somewhere far away, or worse pass
-        // for an unrelated reason. The known cause is a voice that cannot speak the script at
-        // all (no hi-IN voice installed for Devanagari), which is an environment problem and
-        // must be reported as one rather than surfacing later as an opaque decode error.
         if (buf.length < TtsHelper.MIN_REAL_WAV_BYTES) {
             throw new Error(
                 `TTS produced ${buf.length} bytes for "${safe}" — that is silence, not speech ` +
-                `(a WAV header alone is 44 bytes; real speech on this runner is >33KB).\n` +
-                (culture
-                    ? `Voice selection for culture '${culture}' ran but still produced silence — ` +
-                      `the installed voice may not cover this exact text. See docs/LANGUAGE_ONBOARDING.md (Appendix A).`
-                    : `No language was requested (or it has no VOICE_CULTURE entry), so the runner's ` +
-                      `default voice was used — it most likely cannot speak this script. If this text ` +
-                      `is non-English, pass 'lang' through to generateWavBase64.`) +
+                `(a WAV header alone is 44 bytes; real speech should be >1000 bytes). ` +
+                (voice
+                    ? `Voice selection for '${voice}' ran but produced silence. The voice may not support this script.`
+                    : `No language-specific voice was selected; the default voice was used.`) +
                 ` Text was: ${JSON.stringify(safe)}`,
             );
         }
@@ -164,5 +127,54 @@ export class TtsHelper {
         const b64 = buf.toString('base64');
         TtsHelper.cache.set(cacheKey, b64);
         return b64;
+    }
+
+    private static synthesizeWindows(text: string, culture: string | undefined, outFile: string): void {
+        const selectVoice = culture
+            ? `$v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -eq '${culture}' } | Select-Object -First 1; `
+              + `if (-not $v) { throw 'No installed SAPI5 voice for culture ${culture}' }; `
+              + '$s.SelectVoice($v.VoiceInfo.Name);'
+            : '';
+        const ps = [
+            "Add-Type -AssemblyName System.Speech;",
+            '$s = New-Object System.Speech.Synthesis.SpeechSynthesizer;',
+            selectVoice,
+            "$fmt = New-Object System.Speech.AudioFormat.SpeechAudioFormatInfo(16000,[System.Speech.AudioFormat.AudioBitsPerSample]::Sixteen,[System.Speech.AudioFormat.AudioChannel]::Mono);",
+            `$s.SetOutputToWaveFile('${outFile}', $fmt);`,
+            `$s.Speak('${text.replace(/'/g, "''")}');`,
+            '$s.Dispose();',
+        ].filter(Boolean).join(' ');
+
+        execFileSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+            stdio: ['ignore', 'ignore', 'pipe'],
+            timeout: TtsHelper.SYNTH_TIMEOUT_MS,
+        });
+    }
+
+    private static synthesizeLinux(text: string, lang: string | undefined, outFile: string): void {
+        const langCode = lang || 'en';
+        try {
+            execSync(`espeak -v ${langCode} -w "${outFile}" "${text.replace(/"/g, '\\"')}"`, {
+                stdio: ['ignore', 'ignore', 'pipe'],
+                timeout: TtsHelper.SYNTH_TIMEOUT_MS,
+            });
+        } catch {
+            try {
+                execSync(`espeak-ng -v ${langCode} -w "${outFile}" "${text.replace(/"/g, '\\"')}"`, {
+                    stdio: ['ignore', 'ignore', 'pipe'],
+                    timeout: TtsHelper.SYNTH_TIMEOUT_MS,
+                });
+            } catch (e) {
+                throw new Error(`TTS failed: neither espeak nor espeak-ng found. Install espeak-ng: apt install espeak-ng`);
+            }
+        }
+    }
+
+    private static synthesizeMacOS(text: string, voice: string | undefined, outFile: string): void {
+        const voiceArg = voice ? `-v ${voice}` : '';
+        execSync(`say ${voiceArg} -o "${outFile}" "${text.replace(/"/g, '\\"')}"`, {
+            stdio: ['ignore', 'ignore', 'pipe'],
+            timeout: TtsHelper.SYNTH_TIMEOUT_MS,
+        });
     }
 }
