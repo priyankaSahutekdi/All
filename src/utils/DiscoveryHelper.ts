@@ -22,7 +22,12 @@ export class DiscoveryHelper {
         const timestamp = Date.now();
         const pid = process.pid;
         const random = Math.floor(Math.random() * 1_000_000).toString().padStart(6, '0');
-        return `testuser_${timestamp}_${pid}_${random}`;
+        // NO UNDERSCORES: observed live 2026-08-31 (EL-27) that the AXL login form strips "_"
+        // from the User ID field while leaving the Password field untouched, so a username
+        // containing them breaks this helper's own password === username contract and every
+        // run fails at TC-001. Separators are not needed for uniqueness -- timestamp, pid and
+        // a 6-digit random still concatenate to a unique, readable id.
+        return `testuser${timestamp}${pid}${random}`;
     }
 
     /**

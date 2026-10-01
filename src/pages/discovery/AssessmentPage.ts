@@ -9,6 +9,10 @@ export interface AssessmentCopy {
     completionPopup: RegExp;
     letsStart: RegExp;
     continueExact: RegExp;
+    startAssessment: RegExp;
+    skipDemo: RegExp;
+    startGame: RegExp;
+    confirm: RegExp;
     labels: {
         startAssessment: string;
         skipDemo: string;
@@ -49,6 +53,12 @@ export function assessmentPatterns(lang: AppLanguage): AssessmentCopy {
      */
     lazyProp(p, 'continueExact', () => copyRe(K.continue, lang, { exact: true, flags: '' }));
 
+    /** Button matchers — use regex for flexibility with Unicode rendering variations. */
+    lazyProp(p, 'startAssessment', () => copyRe('startAssessment', lang));
+    lazyProp(p, 'skipDemo', () => copyRe(K.skipDemo, lang));
+    lazyProp(p, 'startGame', () => copyRe(K.startGame, lang));
+    lazyProp(p, 'confirm', () => copyRe('confirm', lang));
+
     /** Plain labels, for the `getByText(exact)` call sites. */
     lazyProp(p, 'labels', () => ({
         startAssessment: copy('startAssessment', lang)[0],
@@ -88,10 +98,11 @@ export class AssessmentPage {
 
     // Text-labelled buttons (stable across builds). The labels come from the uiCopy registry,
     // so they follow the run's language instead of being English-only.
-    startAssessmentButton = () => this.page.getByText(this.copy.labels.startAssessment, { exact: true }).first();
-    skipDemoButton = () => this.page.getByText(this.copy.labels.skipDemo, { exact: true }).first();
-    startGameButton = () => this.page.getByText(this.copy.labels.startGame, { exact: true }).first();
-    confirmButton = () => this.page.getByText(this.copy.labels.confirm, { exact: true }).first();
+    // Use regex matching for Unicode rendering robustness (especially Nepali)
+    startAssessmentButton = () => this.page.getByText(this.copy.startAssessment).first();
+    skipDemoButton = () => this.page.getByText(this.copy.skipDemo).first();
+    startGameButton = () => this.page.getByText(this.copy.startGame).first();
+    confirmButton = () => this.page.getByText(this.copy.confirm).first();
     // "Let's Start" may use a straight OR curly apostrophe (or none) — match any char.
     letsStartButton = () => this.page.getByText(this.copy.letsStart).first();
 

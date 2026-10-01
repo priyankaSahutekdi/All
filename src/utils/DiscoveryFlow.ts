@@ -8,6 +8,7 @@ import { FoundationPage } from '../pages/foundation';
 import { DiscoveryHelper } from './DiscoveryHelper';
 import { ANY_LANGUAGE_LABEL_TOKEN, AppLanguage, labelRe, languageByCode } from './languages';
 import { copy, copyAlt, copyRe } from './UiCopy';
+import { TtsHelper } from './TtsHelper';
 import { DiscoveryData } from '../testdata';
 import { TestUser } from '../testdata/discovery/discovery-types';
 
@@ -116,11 +117,42 @@ export async function runDiscoveryFlow(
             return out;
         });
 
-    // Record one item: mic -> (record) -> stop -> replay. Returns the item text.
+    // Record one item: mic -> (real speech injected) -> stop -> replay. Returns the item text.
+    //
+    // Discovery used to record whatever Chromium's fake audio device produced -- a tone, not
+    // speech. The app scores what it hears, so a tone is a coin flip: most sentences advanced
+    // anyway, but some never did, leaving no Play/Retry/Next and stalling the run on that item
+    // forever. One Nepali sentence ("हामीले पाठशालामा सिकेका …") stalled in EVERY run that served
+    // it while shorter ones passed, which is why this first looked like sentence LENGTH and then
+    // like flaky infrastructure. It was neither: the audio was never the prompt.
+    //
+    // F1's word phases already solved this -- installMicInjection() + TtsHelper -- so Discovery
+    // now uses the same mechanism instead of a second, weaker approach. Falls back to the old
+    // silent-window behaviour if synthesis is unavailable for the run's language, so a language
+    // with no installed voice degrades exactly as before rather than failing outright.
     const recordCurrentItem = async (replay = true): Promise<string> => {
         const itemText = (await assess.getSentenceText().catch(() => '')) || '';
+        let b64 = '';
+        if (itemText.trim()) {
+            try {
+                b64 = TtsHelper.generateWavBase64(itemText, lang);
+            } catch (e) {
+                // Not fatal here: a language with no voice still gets the previous behaviour.
+                // Logged once per item rather than swallowed, because silent degradation is how
+                // this class of problem stayed hidden in the first place.
+                console.log(`[record] no TTS for '${lang.code}' (${(e as Error).message.split('\n')[0]}) — recording without injected speech`);
+            }
+        }
+        // Window still scales with the prompt so the injected audio has room to play out.
+        const readMs = Math.min(12000, Math.max(2500, itemText.length * 120));
         await assess.clickMike();                      // start recording
-        await page.waitForTimeout(2500);               // read aloud window
+        await page.waitForTimeout(300);                // let the recorder open the stream
+        if (b64) {
+            await page.evaluate(async ({ b, ms }) => {
+                await (window as unknown as { __playInjected?: (x: string, n: number) => Promise<void> }).__playInjected?.(b, ms);
+            }, { b: b64, ms: readMs }).catch(() => {});
+        }
+        await page.waitForTimeout(readMs);             // read-aloud window
         await assess.clickStop();                      // stop recording
         await page.waitForTimeout(1500);
         if (replay && await assess.playButton().isVisible({ timeout: 4000 }).catch(() => false)) {
@@ -169,7 +201,10 @@ export async function runDiscoveryFlow(
     };
 
     // Dynamic loop: record/replay/next until a completion popup appears.
+    const STALL_REPEATS = 2;
     const completeUntilPopup = async (label: string, maxItems = 20): Promise<void> => {
+        let lastText = '';
+        let repeats = 0;
         for (let i = 0; i < maxItems; i++) {
             if (await completionVisible()) {
                 console.log(`[${label}] completion popup after ${i} items`);
@@ -179,6 +214,30 @@ export async function runDiscoveryFlow(
             const txt = await recordCurrentItem(true);
             console.log(`[${label}] item ${i + 1}: "${txt}"`);
             if (await completionVisible()) return;
+            // FAIL FAST ON A STALL. clickNext() below swallows its error, so a Next that never
+            // lands (or a recording the app never accepts, leaving no post-record controls to
+            // click) used to spin out the full maxItems -- 20 iterations, 12-25 min -- and then
+            // report "completion popup not reached", which names a symptom on the wrong screen
+            // and sends the next reader hunting for a missing completion string. The item text
+            // not changing is the actual signal, so say that instead, immediately.
+            if (txt && txt === lastText) {
+                if (++repeats >= STALL_REPEATS) {
+                    throw new Error(
+                        `[${label}] stalled on item ${i + 1}: the sentence has not changed for ` +
+                        `${STALL_REPEATS + 1} consecutive recordings ("${txt}"). Next is not advancing -- ` +
+                        `the recording was never accepted, so no Play/Retry/Next control rendered. ` +
+                        `This is NOT a missing completion-popup translation, and NOT a recording-window ` +
+                        `problem -- both were tried and neither helps. Some assessment items appear to be ` +
+                        `UNPASSABLE app-side: the Nepali sentence starting "हामीले पाठशालामा सिकेका" ` +
+                        `stalled in 100% of runs that served it (n=4) and passed in 100% that did not ` +
+                        `(n=3), with real TTS audio injected either way. If this names a specific ` +
+                        `sentence repeatedly, raise it as app content rather than debugging the driver.`,
+                    );
+                }
+            } else {
+                repeats = 0;
+                lastText = txt;
+            }
             // advance to next item
             await assess.clickNext().catch(() => {});
             await page.waitForTimeout(2500);
@@ -226,11 +285,17 @@ export async function runDiscoveryFlow(
         // run's language. Asserted via the same header read switchToLanguage verifies with.
         await foundation.expectAppInLanguage(lang);
         // …and the assessment landing is reachable.
-        await expect(page.getByText(copy('startAssessment', lang)[0], { exact: true }).first())
+        // Use regex pattern (copyRe) instead of exact match to handle Unicode rendering variations
+        await expect(page.getByText(copyRe('startAssessment', lang)).first())
             .toBeVisible({ timeout: 15000 });
     });
 
     await test.step('TC-004: Start assessment & leave demo (sentence shown)', async () => {
+        // Give the recorder ONE persistent stream we control, so recordCurrentItem can play the
+        // prompt's real TTS audio into it. Installed here -- before the first assessment -- and
+        // idempotent, so the later assessments reuse it. See recordCurrentItem for why a fake
+        // tone was not good enough.
+        await foundation.installMicInjection().catch(() => {});
         await assess.clickStartAssessment();
         await page.waitForTimeout(3000);
         await leaveDemoIfPresent();

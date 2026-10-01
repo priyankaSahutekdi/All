@@ -2907,6 +2907,195 @@ explicitly deferred until Discovery+F1 are complete, stable and verified.** Full
 coverage mapping, English-vs-Hindi differences, and file-level change plan:
 [Readiness Plan, Phase 4](#phase-4--hindi-discovery--f1).
 
+### EL-27 — Nepali onboarding: TC-001–011 live, two Devanagari codepoint bugs, and the full F1–F3 copy gap enumerated statically
+
+**Date:** 2026-08-31 · **Related task:** user-directed Nepali onboarding · **Status:** 🚧 IN PROGRESS (TC-001–011 PASS; TC-012 blocked on observation)
+
+**Result:** Nepali `FULL_E2E` reaches **TC-001–TC-011 passing live** (Discovery through the Letter
+Hunt demo skip). TC-012 stops on `No 'nepali' UI copy for 'learningJourney'` — a real, expected
+observation gap, not a defect.
+
+**Two bugs of the same class — Devanagari codepoints that look identical but are not:**
+
+| key | had | app renders | difference |
+|---|---|---|---|
+| `startGame` | `खेल सुरु गर्नुहोस्` | `खेल सुरू गर्नुहोस्` | U+0941 vs U+0942 |
+| `skipDemo` | `डेमो छोड़नुहोस्` | `डेमो छोड्नुहोस्` | U+093C NUKTA vs U+094D VIRAMA |
+
+Both were hand-transcribed, and both cost a full debug cycle. `skipDemo` hid until TC-011 because
+TC-004 leaves the demo via *Start Game*, not *Skip Demo*, so the string was never exercised.
+
+**Method change adopted:** observed strings are now extracted **programmatically from the failure
+snapshot's bytes** and substituted into `UiCopyData.ts` by script — never retyped. Verified at
+codepoint level before committing. Retyping Devanagari is not a reliable transcription channel.
+
+**Two values had been GUESSED**, violating this file's own observed-never-translated rule:
+`hurray` (`वाह!!!` → observed `हुर्रे!!!`) and `successfullyCompleted`. TC-009/TC-010 passed anyway
+**only by luck** — `completedAssessment` (`मूल्याङ्कन पूरा`) happened to substring-match the real
+popup, masking both wrong values. A passing test did not mean the data was right.
+
+**The remaining gap was enumerated statically, not discovered one timeout at a time.**
+`missingCopyKeys()` (uiCopyLookup.ts) reports Nepali missing 46 keys and Hindi missing 30 — yet
+Hindi completes F1–F3, so most gaps are English-by-design or off-path. Subtracting gives the
+**18 keys that actually block Nepali TC-013–022**: `nextLevel`, `learningJourney`, `languageSkills`,
+`startFoundationLevel`, `startLevel`, `letterLauncher`, `memoryChallenge`, `letterRecognition`,
+`readyForChallenge`, `fuelLabel`, `progressLabel`, `wordsLearnt`, `lettersOfCount`, `timeUp`,
+`checkSequence`, `correct`, `great`, `wellDone`. Seconds of static analysis replaced hours of
+run-fail-add-rerun. **Use this before starting any future language.**
+
+Note the chicken-and-egg for these: `copy()` resolves at the top of a step, so the run throws at
+1ms and the failure snapshot shows the *previous* screen. The string needed to recognise a screen
+cannot be harvested until that screen is reachable — hence the `_*-observation-probe.spec.ts`
+pattern. Closing all 18 requires driving Nepali through the placement screen, F1 L1–L9/A1–A3, F2,
+and F3's Letter Launcher / Memory Challenge.
+
+**Regression (`npm run e2e:full:both`, English + Hindi):** to fix Nepali, four `AssessmentPage`
+locators were loosened from `getByText(label, {exact:true})` to `getByText(copyRe(...))` — a
+behaviour change for **every** language, not just Nepali (English `confirm` went from exact-match
+to `/(?:Confirm)/i`, which also matches "Confirmation"). **Discovery TC-001–012 passed 12/12 in
+both English and Hindi**, exercising all four changed locators — no regression from the change.
+English then went on to pass all of F1 (TC-013–019).
+
+Both runs did fail deeper — English at TC-020 (F2), Hindi at TC-019 (A3 Apply) — in solver code
+untouched by this work. English's failure text is the app's own *"Couldn't connect right now /
+Please check your internet connection"* preceded by three `[Foundation] ✅ reconnected` events:
+the identical signature [EL-25](#execution-log) already recorded as transient/environmental UAT
+instability. Not re-confirmed sequentially this session; treat as unproven-but-consistent with
+that precedent rather than as a clean pass.
+
+**Environment trap worth knowing:** one unattended 69-minute Nepali run failed on
+`img[alt="Play"]` — a fixed-English, language-independent locator that passed in four runs either
+side of it. Per-step timings were inflated ~400× (TC-005 4.2s → 25m 44s; TC-006 3.7s → 35m 7s)
+while UAT answered in 72 ms and no stray processes existed. The machine idled and headless Chrome
+was throttled. **Disable sleep/idle throttling before any long unattended run**, and treat
+uniform multi-hundred-× step inflation as an environment signal, never a code one.
+
+
+**⚠️ UAT guest-login outage, same session (~20:10 IST onward).** After the regression above
+completed, every run — **English and Nepali alike** — began failing at TC-001 in a consistent
+~84 s with the post-login landing never appearing. The login form is filled correctly (User ID,
+Password, Grade 2 selected, "Login as Guest" present, no error toast) and the page simply stays
+on the login screen. UAT's root URL answers in <150 ms throughout, and English had passed TC-001
+forty minutes earlier on this same commit, so this is **environment-side, not a code regression** —
+consistent with the UAT instability already recorded in EL-25. Anything that fails at TC-001 with
+this signature should be treated as an outage, not debugged as a test defect.
+
+**Observed but UNVERIFIED (revisit when UAT recovers):** during that window a failure snapshot
+showed the login form's User ID field containing `testuser1788…` while the Password field held
+`testuser_1788…` — i.e. the User ID input had stripped the `_` separators, breaking
+`DiscoveryHelper`'s own `password === username` contract. `generateUniqueUsername()` was changed
+to emit an alphanumeric id with no separators, which is strictly safer against input filtering.
+**This did NOT resolve the outage** (English and Nepali both still fail at TC-001 with matching
+fields), so it is hardening against a real observed inconsistency, *not* a validated fix, and it
+has not been exercised against a healthy UAT.
+### EL-28 — Nepali TC-001–013 live, and three English-shaped assumptions in SHARED code that only a different language could expose
+
+**Date:** 2026-09-01 · **Related task:** user-directed "complete the rest of the Nepali test cases" · **Status:** 🚧 IN PROGRESS (TC-001–013 PASS; 17 keys + F1–F3 driving remain)
+
+Nepali now completes **all of Discovery plus the F1 landing (TC-001–TC-013)**, up from TC-001–008
+at the start of the session. Almost none of what blocked it was translation.
+
+**1. `trainProgress()` could not see a 10-item Letter Train.** It told a Letter Train apart from
+the practice/Apply screen by counter LENGTH — accept `X/16`, else any `X/Y` with `Y >= 11`, that
+threshold existing precisely to exclude the practice `/10`. **Nepali's L1 train is 10 items**, so it
+landed on the value the rule exists to reject. The counter was invisible, `completeLetterTrain`
+returned a FALSE `completed("train finished after 0 items")` for a train that had not started, and
+the failure surfaced 20 lines later as an unrelated P1 assertion. English logged 48 `[Letter Train]`
+progress lines for the same step; Nepali logged **zero** — that diff is what found it. Now falls
+back to a STRUCTURAL signal, `img[alt="train"]`, already trusted for this purpose by
+`dismissCoachmarks`. A numeric length heuristic cannot discriminate screens across languages.
+
+**2. The read-aloud window was a flat 2500ms.** Ample for "The cat is sleeping", far too short for a
+60-character Nepali sentence. The app rejects a recording that does not roughly cover the prompt,
+renders no Play/Retry/Next, and the item never advances. **This was misdiagnosed as intermittent app
+flakiness for most of a day.** It is deterministic on sentence LENGTH: Assessment 1 stalled
+reproducibly on its two longest sentences and passed the short ones, so it looked random only
+because it depended which sentences the assessment served. Now scales with the prompt
+(`length * 120ms`, clamped 2.5–12s). TC-009 went from failing ~1 run in 3 to passing in 31s.
+
+**3. A swallowed error cost 12–25 minutes per failure.** `clickNext().catch(() => {})` meant a Next
+that never landed spun the full 20 iterations and then reported *"completion popup not reached"* — a
+symptom on the wrong screen, which is exactly what sent this session hunting a missing completion
+translation that never existed. Now fails on the real signal (item text unchanged across
+consecutive recordings) and says so explicitly. Fixing the diagnostic BEFORE continuing to debug
+paid for itself on the very next run.
+
+All three are language-independent. English and Hindi were one long sentence, or one short train,
+away from the same failures.
+
+**Nepali-specific:** no `VOICE_CULTURE` entry, so F1's say-the-word screens would have fed the app
+the 46-byte silence `TtsHelper` rejects by design — F1+ could never have passed. Nepali now borrows
+the installed **hi-IN** voice (same Devanagari script). Measured on this runner with real Nepali
+text: en-US → 46 bytes (throws), hi-IN → 125326 bytes. Swap to `ne-NP` if such a voice is installed.
+
+**`startFoundationLevel` observed:** `{level} सुरु गर्नुहोस्` — and note it uses **U+0941** where
+`startGame` uses **U+0942**. The app genuinely spells "start" two ways on two screens; hand
+transcription would have silently normalised them and broken one. Extract from snapshot bytes.
+
+**GUESSED VALUES CAUSE FALSE POSITIVES, NOT JUST MISSES.** Two Nepali values invented earlier in
+this session (`successfully`, `complete`) were reverted. Supplying them switched ON
+`FoundationPage`'s `completion` check, which Hindi deliberately runs with DISABLED (`tryCopyRe`
+returns `null` on partial coverage), and `'पूरा'` is generic enough to match almost any screen —
+making a node look complete when it was not. Absent is the SAFE state; the framework is built for
+it. This is the third time a guess cost a debug cycle this session.
+
+**Harvest technique that worked:** temporarily fill each unobserved key with a sentinel that can
+never match real text (working tree only, never committed). `copy()` then resolves, the run walks
+into each screen, the sentinel fails THERE, and the failure snapshot hands over the real string —
+sidestepping the chicken-and-egg where a key needed to RECOGNISE a screen cannot be read until the
+screen is reachable. Regenerate with the `missingCopyKeys` diff from EL-27.
+
+**Regression:** English re-run after all three shared fixes — **TC-001 through TC-020 (F2) PASS**,
+483 `[Letter Train]` lines, exceeding the 2026-08-31 baseline where TC-020 failed. F3 was
+INCONCLUSIVE: the harness's own 50-minute `timeout` killed the process before Playwright printed
+its error block, so treat that F3 line as unfinished, not as a confirmed failure.
+
+**Remaining for Nepali TC-014–022:** 17 blocking keys (`learningJourney`, `languageSkills`,
+`letterLauncher`, `memoryChallenge`, `correct`/`great`/`wellDone`, `timeUp`, `checkSequence`,
+`fuelLabel`, `progressLabel`, `lettersOfCount`, `wordsLearnt`, `readyForChallenge`,
+`letterRecognition`, `nextLevel`, `startLevel`) plus driving F1→F3. TC-014's last run took 36 min
+with the machine idle — matching EL-27's throttling signature — so the train fix is proven only as
+far as "the counter is now visible", not as a completed L1.
+
+### EL-29 — UAT is time-gated to school hours, and a run that crosses the boundary hangs rather than fails
+
+**Date:** 2026-09-21 · **Status:** ✅ recorded (environment constraint, no code fix attempted yet)
+
+A Nepali observation run started late in the evening captured this mid-flow, in English, on an
+otherwise normal Nepali screen:
+
+> **Available during school hours** — This system is up and running when schools are operational
+> (8:00 AM – 24:00 PM IST). Please come back during school hours. **Try Again**
+
+**UAT refuses service outside 08:00–24:00 IST.** This had not been observed before and it changes
+how long runs must be scheduled:
+
+| suite | measured duration |
+|---|---|
+| English `FULL_E2E` (TC-001–023) | 65m 17s |
+| Hindi `FULL_E2E` (TC-001–023) | 54m 32s |
+
+So anything launched after roughly **22:45 IST crosses midnight and dies on the gate**. That rules
+out the obvious "kick the long suite off at the end of the day" habit, and it matters for CI
+scheduling: a nightly cron in the small hours would fail every single time, for a reason that
+looks nothing like its cause.
+
+**The failure mode is the expensive part.** The gate does not surface as "come back later" — the
+app simply stops rendering what the driver is waiting for, so the run blocks on an ordinary
+`toBeVisible` timeout. In this instance the machine then suspended with the run still hanging and
+Playwright reported a duration of **2502 minutes (1.7 days)**. Two days of wall clock bought
+nothing, and the log's proximate error (`expect(locator).toBeVisible() failed`) names neither the
+gate nor the sleep.
+
+**Worth fixing in code, not just documenting:** the banner text is a stable, language-independent
+English string, so a check for it on the stall/timeout paths could convert a 75-minute hang into a
+one-line failure that names the real cause. Not done yet — it touches shared code and would need
+the usual English/Hindi regression before it is trusted.
+
+**Also of note:** the duration figure is itself a useful signal. A step time in the thousands of
+minutes means the host slept mid-run; a step time inflated ~400× uniformly means idle throttling
+(EL-27). Neither is ever a code result, and both have cost real debugging time in this project.
+
 ### Framework Refactor – Multi-Language Onboarding Readiness
 
 **Status: ✅ COMPLETE & VERIFIED (2026-08-19)**

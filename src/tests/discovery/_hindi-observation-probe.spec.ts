@@ -74,7 +74,7 @@ test.describe('@Throwaway Hindi Discovery+F1 observation probe (H2a, not committ
             const file = path.join(OUT_DIR, `${idx}-${label}`);
             let text = '';
             try {
-                text = await page.evaluate(() => document.body.innerText);
+                text = await page.evaluate(() => (document.body?.innerText ?? ''));
                 fs.writeFileSync(`${file}.txt`, text, 'utf8');
             } catch (e) {
                 text = `<<FAILED to read text: ${(e as Error).message}>>`;

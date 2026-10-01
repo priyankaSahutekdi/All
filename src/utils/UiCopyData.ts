@@ -57,10 +57,10 @@ export const UI_COPY = {
      * fixed English for the same reason as `skip` above and is matched via a hardcoded literal
      * at its own call site instead of this key. See `HINDI_ROLLOUT_LOG.md (Decisions Log section)` D-10.
      */
-    confirm: { english: 'Confirm', hindi: 'कन्फर्म करें' },
+    confirm: { english: 'Confirm', hindi: 'कन्फर्म करें', nepali: 'पुष्टि गर्नुहोस्' },
     /** English-only — TC-002's help-language popup renders fixed English; see `confirm` above. */
     chooseHelpLanguage: { english: 'Choose your help language' },
-    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें' },
+    startAssessment: { english: 'Start Assessment', hindi: 'असेसमेंट शुरू करें', nepali: 'मूल्याङ्कन सुरु गर्नुहोस्' },
     letsStart: { english: "Let's Start" },
 
     // ── Transition / advance controls ────────────────────────────────────────
@@ -73,7 +73,7 @@ export const UI_COPY = {
      * never re-confirmed it. **Re-verified live 2026-08-19 (H11)**: the Assessment 1 completion
      * popup's own CTA reads exactly "जारी रखें". P2-15 closed.
      */
-    continueLabel: { english: 'Continue', hindi: 'जारी रखें' },
+    continueLabel: { english: 'Continue', hindi: 'जारी रखें', nepali: 'जारी राख्नुहोस्' },
     next: { english: 'Next' },
     // hindi observed live, H12 (2026-08-20): the post-A1-Apply celebration screen ("अरे वाह!
     // आपने सब सही किया! अगला स्तर 🦉 मुझे आप पर बहुत गर्व है! ऐसे ही जारी रखो!") — "अगला स्तर"
@@ -84,8 +84,8 @@ export const UI_COPY = {
     // one concept depending on screen — 'खेल शुरू करें' (practice-demo entry, confirmed H11/H5)
     // and 'गेम शुरू करें' (Apply-challenge entry, "गेम" is the English loanword). Both are real,
     // both are needed — `copy()` already supports multiple literals per language (an array).
-    startGame: { english: 'Start Game', hindi: ['खेल शुरू करें', 'गेम शुरू करें'] },
-    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', },
+    startGame: { english: 'Start Game', hindi: ['खेल शुरू करें', 'गेम शुरू करें'], nepali: 'खेल सुरू गर्नुहोस्' },
+    skipDemo: { english: 'Skip Demo', hindi: 'डेमो छोड़ें', nepali: 'डेमो छोड्नुहोस्' },
     claim: { english: 'Claim' },
     collect: { english: 'Collect' },
     finish: { english: 'Finish' },
@@ -100,32 +100,41 @@ export const UI_COPY = {
      * शुरू कर सकते हैं। सीखने की यात्रा शुरू हो!" — literal substrings, with the placement
      * level ("B") deliberately excluded, same reason the English values exclude any level.
      */
-    learningJourney: { english: 'learning journey', hindi: 'सीखने की यात्रा' },
-    languageSkills: { english: 'language skills', hindi: 'भाषा कौशल' },
+    learningJourney: { english: 'learning journey', hindi: 'सीखने की यात्रा', nepali: 'सिकाइ यात्रा' },
+    languageSkills: { english: 'language skills', hindi: 'भाषा कौशल', nepali: 'भाषा सीप' },
     /**
      * The journey-map entry into a Foundation level; `{level}` is the F# code. Hindi observed
      * live 2026-08-19 (H11) via the F1 landing screen's accessibility snapshot: "F1 शुरू करें" —
      * note the REVERSED word order vs English (level first, then the "start" verb), which is why
      * this is a template rather than a fixed prefix/suffix string.
      */
-    startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें' },
+    startFoundationLevel: { english: 'Start {level}', hindi: '{level} शुरू करें', nepali: '{level} सुरु गर्नुहोस्' },
     // hindi observed live, EL-24 (2026-08-26): the Mastery landing screen (shown after F3
     // genuinely completes) has a "स्तर 1 शुरू करें" ("Start Level 1") button — same reversed
-    // word order as `startFoundationLevel`. Recorded as the distinguishing word "स्तर" ("Level"/
-    // "Stage", Mastery's own vocabulary, distinct from Foundation's "F#" codes) rather than the
-    // full numbered phrase, since this key (unlike `startFoundationLevel`) has no `{level}`
-    // template to hold the number, and this is only ever used as one of several OR'd "have we
-    // left F3" signals (see `pastF3` below) — a broader single-word match is fine there.
-    startLevel: { english: 'Start Level', hindi: 'स्तर' },
+    // word order as `startFoundationLevel`.
+    //
+    // HINDI IS DELIBERATELY ABSENT, and must stay absent unless it can be given a value that is
+    // not a substring of `nextLevel`. EL-24 recorded it as the bare word "स्तर" on the reasoning
+    // that "a broader single-word match is fine" for an OR'd `pastF3` signal. That reasoning was
+    // WRONG and cost real coverage (2026-09-21): `nextLevel`/hindi is "अगला स्तर", which CONTAINS
+    // "स्तर". `optFrag` joins pastF3 fragments unanchored, so the mid-F3 celebration screen's
+    // "Next Level" button matched `pastF3` and the driver concluded F3 was over after the FIRST
+    // Memory Challenge. Hindi TC-021/022 passed green on ~40% of F3 (9 of 22 nodes) for a month.
+    //
+    // English is unaffected only by luck of phrasing: "Start Level" does not occur inside
+    // "Next Level". Hindi now detects "past F3" from `wordsLearnt` alone, which the multi-signal
+    // design explicitly supports (see `pastF3`) — and if that one signal ever fails to render,
+    // F3 exhausts its iteration budget and fails LOUDLY, which is the safe direction.
+    startLevel: { english: 'Start Level' },
     levelWord: { english: 'Level' },
     foundationWord: { english: 'Foundation' },
 
     // ── Activity identification ─────────────────────────────────────────────
-    howToPlay: { english: 'How to Play', hindi: 'कैसे खेलें' },
+    howToPlay: { english: 'How to Play', hindi: 'कैसे खेलें', nepali: 'कसरी खेल्ने' },
     // hindi observed live, EL-17 (2026-08-26): F3's Letter Launcher game heading read exactly
     // "अक्षर लॉन्चर ईंधन: 0 / 50" above a shown letter + ✓/✗ buttons — "अक्षर लॉन्चर" is this
     // key; "ईंधन" is `fuelLabel` below (screenshot: test-results/f3-unrecognised.png).
-    letterLauncher: { english: 'Letter Launcher', hindi: 'अक्षर लॉन्चर' },
+    letterLauncher: { english: 'Letter Launcher', hindi: 'अक्षर लॉन्चर', nepali: 'अक्षर लन्चर' },
     // hindi observed live, EL-21 (2026-08-26): F3's Memory Challenge screen heading read exactly
     // "मेमोरी चैलेंज" (screenshot captured via completeF3's own diagnostics after a full LL x8
     // solve run; see docs/HINDI_ROLLOUT_LOG.md EL-21/EL-22).
@@ -136,7 +145,7 @@ export const UI_COPY = {
     // rest of that same screen was Marathi, tracked separately as D-13/H12 — not this key).
     // Reused here since `isOnWordRecognition()` matches this exact generic activity-type
     // heading via a whole-page text scan, not a level-specific locator.
-    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान' },
+    letterRecognition: { english: 'Letter Recognition', hindi: 'अक्षर पहचान', nepali: 'अक्षर चिनाइ' },
     didYouSee: { english: 'Did you see' },
     speakCorrectAnswer: { english: 'speak the correct answer' },
     // hindi observed live, H12 (2026-08-20): A1 Apply entry screen — full text "शाबाश!!!
@@ -149,7 +158,7 @@ export const UI_COPY = {
     // ── Progress / scoring readouts (the numbers are parsed separately) ──────
     // hindi observed live, EL-17 (2026-08-26): F3 Letter Launcher's "ईंधन: 0 / 50" readout —
     // same screen/citation as `letterLauncher` above.
-    fuelLabel: { english: 'Fuel', hindi: 'ईंधन' },
+    fuelLabel: { english: 'Fuel', hindi: 'ईंधन', nepali: 'इन्धन' },
     // hindi observed live, EL-21 (2026-08-26): F3 Memory Challenge's "Progress: 0/5" readout
     // rendered the WORD "Progress" in literal English on the Hindi build — not a missing
     // translation guessed as English, a direct observation (same "unlocalized app-shell chrome"
@@ -187,7 +196,7 @@ export const UI_COPY = {
     // three (same idiom as `hurray` being confirmed correct on two different screens) rather
     // than left unobserved. If a live run ever shows a DIFFERENT Hindi phrase for a
     // "Great"/"Well done" moment specifically, split it out then — don't assume this is final.
-    correct: { english: 'Correct', hindi: 'सही है' },
+    correct: { english: 'Correct', hindi: 'सही है', nepali: 'सही' },
     great: { english: 'Great', hindi: 'सही है' },
     wellDone: { english: 'Well done', hindi: 'सही है' },
     awesome: { english: 'Awesome' },
@@ -208,7 +217,10 @@ export const UI_COPY = {
      * completions, the Letter-Hunt-fail result screen) — NOT yet confirmed those screens render
      * the same "शाबाश!!!"; H12/H10 must re-verify before relying on it there.
      */
-    hurray: { english: 'Hurray', hindi: 'शाबाश!!!' },
+    // nepali observed live 2026-08-31 on the Assessment 1 completion popup, whose three lines read
+    // "हुर्रे!!!" / "तपाईंले सफलतापूर्वक मूल्याङ्कन पूरा गर्नुभयो" / "जारी राख्नुहोस्" (the last is
+    // `continueLabel`, confirmed correct by TC-009/TC-010 clicking it successfully).
+    hurray: { english: 'Hurray', hindi: 'शाबाश!!!', nepali: 'हुर्रे!!!' },
     successfully: { english: 'successfully' },
     complete: { english: 'complete' },
     /** Deliberately a STEM: the app renders "Congratulations" and "Congrats". */
@@ -226,8 +238,8 @@ export const UI_COPY = {
      * are driven by the same `completeUntilPopup`/`AssessmentPage.completionPopup` code path).
      * Used only here — no cross-screen reuse risk like `hurray` above.
      */
-    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है' },
-    completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट' },
+    successfullyCompleted: { english: 'successfully completed', hindi: 'सफलतापूर्वक पूरा कर लिया है', nepali: 'सफलतापूर्वक मूल्याङ्कन पूरा' },
+    completedAssessment: { english: 'completed assessment', hindi: 'असेसमेंट', nepali: 'मूल्याङ्कन पूरा' },
 
     // ── Errors ──────────────────────────────────────────────────────────────
     couldntConnect: { english: "Couldn't connect right now" },

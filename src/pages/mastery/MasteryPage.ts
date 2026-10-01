@@ -56,7 +56,7 @@ export class MasteryPage {
      */
     async currentNode(): Promise<string> {
         return await this.page.evaluate(() => {
-            const m = document.body.innerText.replace(/\s+/g, ' ').match(/\b([PS]\d)\b/);
+            const m = (document.body?.innerText ?? '').replace(/\s+/g, ' ').match(/\b([PS]\d)\b/);
             return m ? m[1] : '';
         });
     }
@@ -86,7 +86,7 @@ export class MasteryPage {
 
     /** True when the current card is a "Did you see the word?" Yes/No recognition item. */
     async isDidYouSeeCard(): Promise<boolean> {
-        return await this.page.evaluate(() => /Did you see/i.test(document.body.innerText));
+        return await this.page.evaluate(() => /Did you see/i.test((document.body?.innerText ?? '')));
     }
 
     /**
@@ -100,7 +100,7 @@ export class MasteryPage {
             // its localized wording has to be read off the real Hindi build before it can be
             // keyed by language (BUILD_HISTORY.md (Refactoring Plan section) task 13). Only the captured word's
             // character class is script-agnostic here.
-            const m = document.body.innerText.replace(/\s+/g, ' ')
+            const m = (document.body?.innerText ?? '').replace(/\s+/g, ' ')
                 .match(new RegExp(`Did you see the word\\?\\s*([${cls}']+)`, 'iu'));
             return m ? m[1] : '';
         }, LETTER_CLASS);
@@ -128,7 +128,7 @@ export class MasteryPage {
      */
     async readSentence(): Promise<string> {
         return await this.page.evaluate(({ cls, langSrc }) => {
-            const t = document.body.innerText.replace(/\s+/g, ' ').trim();
+            const t = (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim();
             // The reading sentence sits after the language label and before the speed
             // selector / nav pills / build stamp. Slice it out — robust to any punctuation
             // (curly apostrophes, single-letter leading words) that a strict regex trips on.
@@ -266,7 +266,7 @@ export class MasteryPage {
 
     /** Whether the Slow/Medium/Fast paced-reading speed selector is on screen. */
     private async hasSpeedSelector(): Promise<boolean> {
-        return await this.page.evaluate(() => /\bSlow\b/.test(document.body.innerText) && /\bFast\b/.test(document.body.innerText));
+        return await this.page.evaluate(() => /\bSlow\b/.test((document.body?.innerText ?? '')) && /\bFast\b/.test((document.body?.innerText ?? '')));
     }
 
     /** Select the "Fast" reading speed (shortens the word-ticker on paced items). */
@@ -321,8 +321,8 @@ export class MasteryPage {
 
     /** The S1 assessment entry ("Ready for Challenge? Start Game"). */
     async isS1Entry(): Promise<boolean> {
-        return await this.page.evaluate(() => /Ready for Challenge/i.test(document.body.innerText)
-            && /Start Game/i.test(document.body.innerText));
+        return await this.page.evaluate(() => /Ready for Challenge/i.test((document.body?.innerText ?? ''))
+            && /Start Game/i.test((document.body?.innerText ?? '')));
     }
 
     /** True once the M4 P-practices (P1–P4) are complete: the S1 assessment is reached. */
@@ -427,7 +427,7 @@ export class MasteryPage {
     /** True once S1 is complete: the app has advanced past S1 to the next node/stage. */
     async isPastS1(): Promise<boolean> {
         return await this.page.evaluate(() => {
-            const t = document.body.innerText;
+            const t = (document.body?.innerText ?? '');
             // Left the S1 assessment: the "speak the correct answer" prompt is gone AND
             // either a completion/next-stage marker shows or S1 is no longer the active pill.
             if (/speak the correct answer/i.test(t)) return false;
@@ -474,7 +474,7 @@ export class MasteryPage {
 
     private async hasText(re: RegExp): Promise<boolean> {
         const src = re.source; const flags = re.flags;
-        return await this.page.evaluate(({ s, f }) => new RegExp(s, f).test(document.body.innerText), { s: src, f: flags });
+        return await this.page.evaluate(({ s, f }) => new RegExp(s, f).test((document.body?.innerText ?? '')), { s: src, f: flags });
     }
 
     /**

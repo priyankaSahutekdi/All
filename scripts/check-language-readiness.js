@@ -10,7 +10,7 @@
  *
  * Usage:
  *   node scripts/check-language-readiness.js hindi
- *   node scripts/check-language-readiness.js hindi tamil telugu   # multiple languages at once
+ *   node scripts/check-language-readiness.js hindi nepali kannada  # multiple languages at once
  */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -20,7 +20,7 @@ const path = require('path');
 const codes = process.argv.slice(2);
 if (codes.length === 0) {
     console.error('Usage: node scripts/check-language-readiness.js <language-code> [more-codes...]');
-    console.error('Known codes come from src/utils/languages.ts (e.g. hindi, tamil, telugu, kannada, gujarati, odia).');
+    console.error('Known codes come from src/utils/languages.ts: english, hindi, nepali, kannada, telugu.');
     process.exit(1);
 }
 

@@ -61,9 +61,80 @@ function readData<T>(lang: AppLanguage, file: string): T {
     }
 }
 
-/** Parked automation accounts for a language. */
+/**
+ * Parked accounts are MUTABLE SHARED STATE, so two languages must never name the same one.
+ *
+ * Foundation levels advance PERMANENTLY: driving F3 on `Testf3auto` carries that account past
+ * F3 for every language that names it, and it cannot be reused without a manual reset. This is
+ * not hypothetical — on 2026-09-01 `testdata/nepali/accounts.json` was created by copying
+ * English's, so a Nepali F3 run consumed ENGLISH's parked account (EL-29). The parallel runner
+ * drives language lanes concurrently, so the same collision can also corrupt two live runs at
+ * once, and it surfaces as unreproducible "flaky app" failures rather than as a fixture bug.
+ *
+ * Checked here rather than in a test because it must fail for ANY entry point that loads
+ * accounts, and it must fail BEFORE a run starts spending an account it does not own.
+ */
+function assertAccountsNotShared(lang: AppLanguage, mine: Accounts): void {
+    const root = __dirname;
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+        if (!entry.isDirectory() || entry.name === lang.code) continue;
+        const other = path.join(root, entry.name, 'accounts.json');
+        if (!fs.existsSync(other)) continue;
+        let theirs: Accounts;
+        try { theirs = JSON.parse(fs.readFileSync(other, 'utf8')) as Accounts; } catch { continue; }
+        const theirNames = new Set(Object.values(theirs).map((a) => a?.username).filter(Boolean));
+        const clashes = Object.entries(mine)
+            .filter(([, a]) => a?.username && theirNames.has(a.username))
+            .map(([slot, a]) => `${slot}="${a.username}"`);
+        if (clashes.length) {
+            throw new Error(
+                `Parked account collision: testdata/${lang.code}/accounts.json shares ` +
+                `${clashes.join(', ')} with testdata/${entry.name}/accounts.json. ` +
+                `Parked accounts advance PERMANENTLY, so a '${lang.code}' run would consume ` +
+                `'${entry.name}' accounts (and vice versa), and concurrent language lanes would ` +
+                `corrupt each other. Give '${lang.code}' its OWN provisioned accounts, or delete ` +
+                `testdata/${lang.code}/accounts.json so it uses the dynamic-user path instead ` +
+                `(which is what Hindi does).`,
+            );
+        }
+    }
+}
+
+/**
+ * Parked automation accounts for a language, or a clear explanation of why there are none.
+ *
+ * NOT every language has these, and that is a legitimate state rather than a gap to fill.
+ * There are two ways a language gets F2/F3 coverage:
+ *
+ *   - PARKED ACCOUNT (english): `foundation-f2.spec.ts` / `foundation-f3.spec.ts` log in as an
+ *     account already sitting at that level and drive it directly. Fast, but the account advances
+ *     PERMANENTLY, so it is single-use until reset.
+ *   - DYNAMIC USER (hindi, nepali): the `FULL_E2E` run plays one fresh guest through
+ *     Discovery → F1 → F2 → F3 in a single session. Slower, but consumes no shared fixture.
+ *     Confirmed viable 2026-09-01: Hindi passed TC-001–TC-023 this way in 54m32s.
+ *
+ * The generic `readData` message is actively misleading here — it tells the reader the file
+ * "must be observed on a real build, not translated", which is true of screen copy and of
+ * discovery-data.json but nonsense for an account: accounts are PROVISIONED in the app, not read
+ * off a screen. Someone hitting that message would go looking for something unobservable.
+ */
 export function loadAccounts(lang: AppLanguage): Accounts {
-    return readData<Accounts>(lang, 'accounts.json');
+    const full = path.join(dataDir(lang), 'accounts.json');
+    if (!fs.existsSync(full)) {
+        throw new Error(
+            `No parked accounts for language '${lang.code}' (expected ${full}).\n` +
+            `This is not a missing translation — parked accounts are PROVISIONED in the app, not ` +
+            `observed on a build. Either:\n` +
+            `  • run this language through the dynamic-user path instead (FULL_E2E: ` +
+            `npm run e2e:full:${lang.code}), which is how hindi and nepali are covered; or\n` +
+            `  • provision accounts FOR '${lang.code}' and add them here. Do NOT copy another ` +
+            `language's file: parked accounts advance permanently, so sharing one makes each ` +
+            `language consume the other's progress (see assertAccountsNotShared).`,
+        );
+    }
+    const accounts = readData<Accounts>(lang, 'accounts.json');
+    assertAccountsNotShared(lang, accounts);
+    return accounts;
 }
 
 /** One parked account by series slot, with a clear error if that slot is not defined. */

@@ -38,13 +38,13 @@ export class VqaSpeakingAssessment {
 
     /** True while a "speak the correct answer" picture question is on screen. */
     async isOnQuestion(): Promise<boolean> {
-        return await this.page.evaluate(() => /speak the correct answer/i.test(document.body.innerText));
+        return await this.page.evaluate(() => /speak the correct answer/i.test((document.body?.innerText ?? '')));
     }
 
     /** Number of remaining "lives" (the assessment fails at 0), or -1 if not shown. */
     async livesLeft(): Promise<number> {
         return await this.page.evaluate(() => {
-            const m = document.body.innerText.match(/You have\s+(\d+)\s+lives/i);
+            const m = (document.body?.innerText ?? '').match(/You have\s+(\d+)\s+lives/i);
             return m ? Number(m[1]) : -1;
         });
     }
@@ -254,7 +254,7 @@ export class VqaSpeakingAssessment {
             await this.page.waitForTimeout(1000);
             if (await isDone()) return { ...base, outcome: 'advanced' };
             await this.clickContinueIfAny();
-            const now = await this.page.evaluate(() => document.body.innerText);
+            const now = await this.page.evaluate(() => (document.body?.innerText ?? ''));
             if (/TRY AGAIN|can't hear|Oops|not quite/i.test(now)) {
                 return { ...base, outcome: 'wrong' };
             }

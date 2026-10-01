@@ -16,6 +16,42 @@ import { COPY_KEYS, CopyKey, UI_COPY } from './UiCopyData';
  * Throws when the language has no value for a key — see the DESIGN note above; falling back to
  * English would produce a green run that validated the wrong language.
  */
+
+/**
+ * A harvest PLACEHOLDER must never be mistaken for observed copy.
+ *
+ * Onboarding a language uses a deliberate trick: fill each unobserved key with a value that can
+ * never match real screen text, so `copy()` resolves and the run walks far enough into the app to
+ * show you the real string on a failure snapshot (see docs/HINDI_ROLLOUT_LOG.md EL-28). That trick
+ * is only safe while the placeholders stay in the working tree. Committed, they are silent poison:
+ * coverage metrics count them as populated (`missingCopyKeys` reported Nepali at parity with Hindi
+ * while 12 keys were fake), and every matcher built from them looks for text that cannot exist, so
+ * the failure surfaces as a timeout on some unrelated screen.
+ *
+ * This happened TWICE on 2026-09-01 despite being called out as a rule both times, which is what a
+ * check is for. Placeholders are still fine to use — they just cannot survive a commit unnoticed.
+ */
+const PLACEHOLDER_RE = /^UNOBS\b|^__(TODO|PLACEHOLDER|UNOBSERVED)/i;
+
+function assertNotPlaceholder(key: CopyKey, lang: AppLanguage, value: string): void {
+    if (!PLACEHOLDER_RE.test(value)) return;
+    // ESCAPE HATCH for the harvest itself. Filling unobserved keys with non-matching placeholders
+    // is how a run is walked deep enough to SEE the real strings, so the check that stops them
+    // shipping would otherwise also stop them working. Same shape as ALLOW_STALE_F3 in
+    // foundation-f3.spec.ts: opt-in, per-run, and stated rather than silent. A normal run -- and
+    // therefore CI -- still refuses, which is the case that matters.
+    if (process.env.ALLOW_COPY_PLACEHOLDERS === '1') {
+        console.log(`[uiCopy] PLACEHOLDER in use: '${key}'/'${lang.code}' = "${value}" (ALLOW_COPY_PLACEHOLDERS=1) — harvest only, must not be committed`);
+        return;
+    }
+    throw new Error(
+        `uiCopy '${key}' for '${lang.code}' is a harvest PLACEHOLDER ("${value}"), not observed copy. ` +
+        `Placeholders exist only to walk a run far enough to observe the real string; they must be ` +
+        `replaced from a failure snapshot before committing. Strip them with:\n` +
+        `  node -e "const f=require('fs'),p='src/utils/UiCopyData.ts';f.writeFileSync(p,f.readFileSync(p,'utf8').replace(/, ${lang.code}: '[^']*UNOBS[^']*'/g,''))"\n` +
+        `then re-run to see which key the app actually stops on.`,
+    );
+}
 export function copy(keys: CopyKey | readonly CopyKey[], lang: AppLanguage): string[] {
     const list = typeof keys === 'string' ? [keys] : keys;
     return list.flatMap((key) => {
@@ -28,7 +64,9 @@ export function copy(keys: CopyKey | readonly CopyKey[], lang: AppLanguage): str
                 `Defined for: ${Object.keys(entry).join(', ')}`,
             );
         }
-        return typeof value === 'string' ? [value] : [...value];
+        const list2 = typeof value === 'string' ? [value] : [...value];
+        list2.forEach((v) => assertNotPlaceholder(key, lang, v));
+        return list2;
     });
 }
 

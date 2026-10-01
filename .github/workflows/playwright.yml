@@ -48,24 +48,16 @@ jobs:
         run: npm run lint
 
   test:
-    name: 🧪 Run Tests
+    name: 🧪 Run Tests (${{ matrix.os }})
     # Manual only. See the `verify` job above for why this does not run on push/PR.
     if: github.event_name == 'workflow_dispatch'
     needs: verify
-    runs-on: ubuntu-latest
-    # Long, because the suite now runs SERIALLY (see below) and its own per-spec timeouts are
-    # 45-75 minutes. The previous 30 was sized for one of four parallel shards.
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 180
-
-    # NO SHARD MATRIX, deliberately.
-    #
-    # These specs drive shared, stateful UAT accounts (Testf2auto / Testf3auto / m4auto) through
-    # a single browser session each. Sharding runs N Playwright PROCESSES, so two shards can log
-    # into the same account at the same time and corrupt each other's journey position — and
-    # because a parked account's position is what the specs resume from, the damage outlives the
-    # run. --workers=1 does not help: it only serializes within one process.
-    #
-    # Re-enable sharding only when each shard has its own dedicated set of accounts.
 
     steps:
       - name: 📥 Checkout Repository
@@ -80,13 +72,15 @@ jobs:
       - name: 📦 Install Dependencies
         run: npm ci
 
+      - name: 🎭 Install TTS Dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y espeak-ng espeak-ng-data
+
       - name: 🎭 Install Playwright Browsers
         run: npx playwright install --with-deps chromium
 
-      # Routed through scripts/run-e2e.js, which is the one entry point that already knows this
-      # suite is not parallel-safe (it pins workers=1 for the regression set). Every automated
-      # entry point used to call `npx playwright test` directly and silently inherit
-      # fullyParallel: true with workers: 2 under CI — a correctness risk, not an inefficiency.
       - name: 🧪 Run Playwright Tests (serial)
         run: |
           if [ -n "${{ github.event.inputs.test_tag }}" ]; then
@@ -94,12 +88,13 @@ jobs:
           else
             node scripts/run-e2e.js --regression
           fi
+        shell: bash
 
       - name: 📊 Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.os }}
           path: |
             playwright-report/
             test-results/
@@ -110,22 +105,21 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: failure-screenshots
+          name: failure-screenshots-${{ matrix.os }}
           path: test-results/**/*.png
           retention-days: 7
 
-      # The merge-reports job that used to follow is gone with the shard matrix: with a single
-      # serial run there is nothing to merge, and `playwright merge-reports` over one blob report
-      # would just re-emit it. The report is uploaded above.
       - name: 📊 Publish Report Summary
         if: always()
         run: |
-          echo "## 🎭 Playwright Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "## 🎭 Playwright Test Results - ${{ matrix.os }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🖥️ OS | ${{ matrix.os }} |" >> $GITHUB_STEP_SUMMARY
           echo "| ▶️ Execution | serial (workers=1, no sharding — shared UAT accounts) |" >> $GITHUB_STEP_SUMMARY
           echo "| 🌐 Browser | Chromium |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📁 Download the report from the Artifacts section above." >> $GITHUB_STEP_SUMMARY
+        shell: bash
 
